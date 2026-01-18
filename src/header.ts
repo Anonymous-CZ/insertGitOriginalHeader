@@ -1,3 +1,12 @@
+/*
+ * @Author: Anonymous-CZ
+ * @Date: 2026-01-18 13:29:07
+ * @LastEditors: Anonymous-CZ
+ * @LastEditTime: 2026-01-18 15:27:56
+ * @FilePath: src/header.ts
+ * @Description: 文件头内容行生成与注释包裹（纯字符串渲染）。
+ */
+
 import type { CommentStyle } from './commentStyle';
 
 export interface HeaderData {
@@ -9,6 +18,16 @@ export interface HeaderData {
 	description?: string;
 }
 
+/**
+ * 将结构化文件头数据渲染为“内容行”（不包含外层注释符号）。
+ *
+ * 注意：
+ * - 字段顺序固定，便于人读与工具处理。
+ * - `description` 若为空，会渲染为空字符串（保留该字段行）。
+ *
+ * @param data 结构化文件头数据
+ * @returns 不带外层注释符号的内容行数组
+ */
 export function renderHeaderBodyLines(data: HeaderData): string[] {
 	return [
 		`@Author: ${data.author}`,
@@ -20,6 +39,17 @@ export function renderHeaderBodyLines(data: HeaderData): string[] {
 	];
 }
 
+/**
+ * 使用指定注释风格包裹多行内容，并以换行结尾。
+ *
+ * 约定：
+ * - 当 `lines` 为空时，会输出一个“空内容行”，以确保得到合法注释块。
+ * - 返回值总是以 `\n` 结尾，便于直接插入到文件顶部。
+ *
+ * @param style 注释风格
+ * @param lines 需要包裹的内容行（不含换行）
+ * @returns 包裹后的完整注释文本（以换行结尾）
+ */
 export function wrapWithComment(style: CommentStyle, lines: string[]): string {
 	const safeLines = lines.length > 0 ? lines : [''];
 

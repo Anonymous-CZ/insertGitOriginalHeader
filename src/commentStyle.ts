@@ -1,3 +1,12 @@
+/*
+ * @Author: Anonymous-CZ
+ * @Date: 2026-01-18 13:29:07
+ * @LastEditors: Anonymous-CZ
+ * @LastEditTime: 2026-01-18 15:27:43
+ * @FilePath: src/commentStyle.ts
+ * @Description: 根据语言/扩展名解析注释风格，并提供默认映射与兜底策略。
+ */
+
 export type CommentStyle =
 	| 'htmlBlock'
 	| 'cBlock'
@@ -14,6 +23,15 @@ export interface CommentStyleConfig {
 	unknownFileBehavior?: UnknownFileBehavior;
 }
 
+/**
+ * 规范化扩展名：小写、去空白，并保证以 `.` 开头。
+ *
+ * @example
+ * normalizeExtension('TS') => '.ts'
+ *
+ * @param ext 原始扩展名（可含/不含 `.`）
+ * @returns 规范化后的扩展名；空输入返回空字符串
+ */
 export function normalizeExtension(ext: string): string {
 	const trimmed = ext.trim().toLowerCase();
 	if (!trimmed) {
@@ -22,6 +40,16 @@ export function normalizeExtension(ext: string): string {
 	return trimmed.startsWith('.') ? trimmed : `.${trimmed}`;
 }
 
+/**
+ * 从文件名中提取扩展名（含 `.`，小写）。
+ *
+ * 规则：
+ * - 仅识别最后一个 `.` 后缀
+ * - `.gitignore` 这类“点文件”不视为有扩展名（返回空字符串）
+ *
+ * @param fileName 文件名或路径
+ * @returns 规范化扩展名（含 `.`）；无扩展名则返回空字符串
+ */
 export function getFileExtension(fileName: string): string {
 	const normalized = fileName.replace(/\\/g, '/');
 	const baseName = normalized.split('/').pop() ?? '';
@@ -130,6 +158,19 @@ export interface ResolveCommentStyleResult {
 		| 'unknown';
 }
 
+/**
+ * 解析当前文件应使用的注释风格。
+ *
+ * 优先级（从高到低）：
+ * 1) `NO_COMMENT_LANGUAGES`：明确不支持注释的语言直接返回 null
+ * 2) 配置 `commentStyleByLanguage[languageId]`
+ * 3) 配置 `commentStyleByExtension[.ext]` 或 `[ext]`
+ * 4) 内置默认映射（按 languageId）
+ * 5) 内置默认映射（按扩展名）
+ *
+ * @param input 解析所需的语言标识、文件名与可选配置
+ * @returns 解析结果；`style=null` 表示“无法安全确定注释方式”，交由上层按 unknown 行为处理
+ */
 export function resolveCommentStyle(input: ResolveCommentStyleInput): ResolveCommentStyleResult {
 	const languageId = input.languageId.trim().toLowerCase();
 	if (NO_COMMENT_LANGUAGES.has(languageId)) {
@@ -167,6 +208,14 @@ export function resolveCommentStyle(input: ResolveCommentStyleInput): ResolveCom
 	return { style: null, reason: 'unknown' };
 }
 
+/**
+ * 获取无法识别注释风格时的处理策略。
+ *
+ * 默认值为 `skip`：宁可不插入，也不破坏文件语法。
+ *
+ * @param config 可选配置
+ * @returns 未知文件处理策略
+ */
 export function getUnknownFileBehavior(config?: CommentStyleConfig): UnknownFileBehavior {
 	return config?.unknownFileBehavior ?? 'skip';
 }

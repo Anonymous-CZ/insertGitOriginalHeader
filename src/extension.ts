@@ -1,18 +1,47 @@
+/*
+ * @Author: Anonymous-CZ
+ * @Date: 2026-01-18 13:30:06
+ * @LastEditors: Anonymous-CZ
+ * @LastEditTime: 2026-01-18 15:27:52
+ * @FilePath: src/extension.ts
+ * @Description: VS Code 扩展入口：获取 Git 原始作者/时间并按注释风格插入文件头。
+ */
+
 import * as vscode from 'vscode';
-import { exec } from 'child_process'; // 用于执行Git命令
-import { promisify } from 'util'; // 将回调函数转为Promise
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { stat } from 'fs/promises';
 import { formatLocalDateTime, parseLocalDateTimeString, pickEarliestDate } from './dateTime';
 import { getUnknownFileBehavior, resolveCommentStyle, type CommentStyle, type CommentStyleConfig, type UnknownFileBehavior } from './commentStyle';
 import { renderHeaderBodyLines, wrapWithComment } from './header';
 import { pickAuthor } from './author';
-const execAsync = promisify(exec); // 异步执行命令
-// 新增：定义一个接口来规范返回的数据结构
-interface GitCommitInfo {
-	author: string;
-	date: string; // 格式化为 'YYYY-MM-DD HH:mm:ss'
+
+const execAsync = promisify(exec); // Promise 版 exec：用于运行 git 命令
+const DEBUG_LOG_ENABLED = process.env.GIT_ORIGINAL_AUTHOR_HEADER_DEBUG === '1'; // 设为 "1" 时输出调试日志
+
+let logChannel: vscode.LogOutputChannel | undefined;
+
+function logDebug(message: string, ...optionalParams: unknown[]): void {
+	if (!DEBUG_LOG_ENABLED) {
+		return;
+	}
+	logChannel?.debug(message, ...optionalParams);
 }
 
+function logWarn(message: string, ...optionalParams: unknown[]): void {
+	logChannel?.warn(message, ...optionalParams);
+}
+
+interface GitCommitInfo {
+	author: string;
+	date: string; // `YYYY-MM-DD HH:mm:ss`
+}
+
+/**
+ * 读取当前工作区 Git 用户名（git config user.name）。
+ *
+ * @returns 获取失败返回空字符串（上层决定兜底文案）
+ */
 async function getCurrentGitUserName(): Promise<string> {
 	try {
 		const { stdout } = await execAsync('git config user.name', { cwd: vscode.workspace.rootPath });
@@ -22,6 +51,9 @@ async function getCurrentGitUserName(): Promise<string> {
 	}
 }
 
+/**
+ * 从 VS Code Settings 读取注释风格配置。
+ */
 function readCommentStyleConfig(): CommentStyleConfig {
 	const config = vscode.workspace.getConfiguration('git-original-author-header');
 	return {
@@ -31,6 +63,11 @@ function readCommentStyleConfig(): CommentStyleConfig {
 	};
 }
 
+/**
+ * 获取文件系统记录的创建时间（birthtime）。
+ *
+ * @returns 若平台不支持或无效则返回 null
+ */
 async function getFileBirthTime(filePath: string): Promise<Date | null> {
 	try {
 		const stats = await stat(filePath);
@@ -43,10 +80,16 @@ async function getFileBirthTime(filePath: string): Promise<Date | null> {
 		return null;
 	}
 }
-// 修改函数：同时获取原始作者和提交时间
+
+/**
+ * 获取文件在 Git 历史中的“最早提交信息”（作者 + 提交时间）。
+ *
+ * 说明：
+ * - 对未跟踪/无历史文件，git log 输出为空，函数返回空字符串字段（由上层做兜底）。
+ * - 时间格式固定为本地字符串 `YYYY-MM-DD HH:mm:ss`。
+ */
 async function getOriginalGitCommitInfo(filePath: string): Promise<GitCommitInfo> {
 	return new Promise((resolve) => {
-		// 关键命令：同时获取作者(%an)和提交时间(%ad)，时间格式已指定
 		const command = `git --no-pager log --reverse --pretty=format:"%an|||%ad" --date=format:"%Y-%m-%d %H:%M:%S" -1 -- "${filePath.replace(/"/g, '\\"')}"`;
 
 		exec(command, { cwd: vscode.workspace.rootPath }, (error, stdout, stderr) => {
@@ -57,7 +100,7 @@ async function getOriginalGitCommitInfo(filePath: string): Promise<GitCommitInfo
 				if (delimiterIndex >= 0) {
 					const author = trimmed.slice(0, delimiterIndex).trim();
 					const date = trimmed.slice(delimiterIndex + delimiter.length).trim();
-					console.log(`成功获取原始提交信息 - 作者: ${author}, 时间: ${date}`);
+					logDebug(`成功获取原始提交信息 - 作者: ${author}, 时间: ${date}`);
 					resolve({ author, date });
 					return;
 				}
@@ -67,16 +110,23 @@ async function getOriginalGitCommitInfo(filePath: string): Promise<GitCommitInfo
 				return;
 			}
 
-			console.error('无法获取原始提交信息:', error?.message || stderr);
+			// 常见原因：文件未纳入 Git 追踪/无历史。这里只记录到 Output 面板，功能仍按空值兜底继续。
+			logWarn('无法获取原始提交信息（将使用兜底值）:', error?.message || stderr);
 			// 对未跟踪/无历史文件，stdout 为空：让后续逻辑做兜底选择。
 			resolve({ author: '', date: '' });
 		});
 	});
 }
 
-// 插件激活时执行的函数
+/**
+ * VS Code 扩展激活入口：注册命令并在执行时向文件顶部插入头注释。
+ *
+ * @param context VS Code 提供的扩展上下文，用于管理订阅生命周期
+ */
 export function activate(context: vscode.ExtensionContext) {
-	// 注册一个命令，命令ID需与package.json中一致
+	logChannel = vscode.window.createOutputChannel('Git Original Author Header', { log: true });
+	context.subscriptions.push(logChannel);
+
 	let disposable = vscode.commands.registerCommand('git-original-author-header.insertGitOriginalHeader', async () => {
 		const editor = vscode.window.activeTextEditor;
 		if (!editor) {
@@ -122,25 +172,20 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 		const currentGitUserName = await getCurrentGitUserName();
 
-		// 获取原始提交信息（作者 + 时间）
 		const originalCommitInfo = await getOriginalGitCommitInfo(filePath);
 		const originalAuthor = pickAuthor({
 			gitOriginalAuthor: originalCommitInfo.author,
 			currentGitUserName,
 		});
-		const gitOriginalDateString = originalCommitInfo.date;
+		const gitOriginalDateString = originalCommitInfo.date; // `YYYY-MM-DD HH:mm:ss`
 		const gitOriginalDate = parseLocalDateTimeString(gitOriginalDateString);
 
 		const fileBirthTime = await getFileBirthTime(filePath);
-		const chosenDate = pickEarliestDate(gitOriginalDate, fileBirthTime) ?? parseLocalDateTimeString('1970-01-01 00:00:00')!;
+		const chosenDate = pickEarliestDate(gitOriginalDate, fileBirthTime) ?? parseLocalDateTimeString('1970-01-01 00:00:00')!; // 始终取“更早的时间”作为创建时间
 		const chosenDateString = formatLocalDateTime(chosenDate);
 
-		// 获取当前用户和当前时间
 		const lastEditor = currentGitUserName || 'Current User';
-
 		const currentDateTime = formatLocalDateTime(new Date());
-
-		// 获取文件路径
 		const relativeFilePath = vscode.workspace.asRelativePath(filePath);
 
 		const headerLines = renderHeaderBodyLines({
@@ -153,7 +198,6 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 		const header = wrapWithComment(chosenCommentStyle, headerLines) + '\n';
 
-		// 将文件头插入到编辑器的最顶部
 		editor.edit(editBuilder => {
 			editBuilder.insert(new vscode.Position(0, 0), header);
 		});
@@ -161,9 +205,10 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('已插入包含原始Git作者的文件头！');
 	});
 
-	// 将命令注册到订阅中，以便插件卸载时清理
 	context.subscriptions.push(disposable);
 }
 
-// 插件停用时执行的函数（可选）
+/**
+ * VS Code 扩展停用钩子。
+ */
 export function deactivate() { }
