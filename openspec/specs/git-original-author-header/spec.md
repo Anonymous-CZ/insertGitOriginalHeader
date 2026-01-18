@@ -119,3 +119,39 @@
 - **WHEN** 用户执行“插入Git原始作者文件头”命令
 - **THEN** `@Author` SHALL 等于 Git 原始作者
 
+### Requirement: 核心源码注释与文档保持可维护
+系统 SHALL 保持核心源码包含简洁的文件头描述与准确的函数级 JSDoc，以支持在不改变运行时行为的前提下安全维护。
+
+#### Scenario: 维护者审阅核心源码文件
+- **GIVEN** 仓库包含核心文件 `src/extension.ts`、`src/header.ts`、`src/commentStyle.ts`、`src/dateTime.ts`、`src/author.ts`
+- **WHEN** 维护者打开并审阅这些文件
+- **THEN** 文件头 `@Description` SHALL 存在且能简洁说明该文件职责
+- **AND** 每个导出函数 SHALL 具备覆盖意图、参数、返回值与兜底/边界行为的 JSDoc
+
+### Requirement: 函数体内注释保持克制
+系统 SHALL 将函数体内行内注释控制在最低限度，仅在复杂或非直观规则处补充说明。
+
+#### Scenario: 维护者快速浏览实现细节
+- **GIVEN** 维护者正在阅读核心函数实现
+- **WHEN** 浏览函数体内容
+- **THEN** 行内注释 SHALL 仅出现在复杂区域（例如 Git 命令转义、时间兜底规则）
+- **AND** 简单语句 SHALL 不添加冗余说明
+
+### Requirement: Core source files include maintainable documentation
+The system SHALL keep core source files documented with concise file descriptions and accurate function-level JSDoc to support safe maintenance without changing runtime behavior.
+
+#### Scenario: Repository maintainer reviews core sources
+- **GIVEN** the repository contains the core files `src/extension.ts`, `src/header.ts`, `src/commentStyle.ts`, `src/dateTime.ts`, `src/author.ts`
+- **WHEN** a maintainer opens each file for review
+- **THEN** the file header `@Description` is present and concisely describes the file responsibility
+- **AND** each exported function has JSDoc covering intent, parameters, return value, and fallback/edge behaviors
+
+### Requirement: Comments stay lightweight inside function bodies
+The system SHALL keep function-body inline comments minimal, adding them only where complexity or non-obvious rules exist.
+
+#### Scenario: Maintainer scans implementation for noise
+- **GIVEN** the maintainer is reading the implementation of core functions
+- **WHEN** the function body is scanned
+- **THEN** inline comments are limited to complex areas (e.g., Git command escaping, timestamp fallback rules)
+- **AND** simple statements do not receive redundant commentary
+

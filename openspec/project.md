@@ -31,8 +31,14 @@
 - 规则偏好：
 	- `eqeqeq`、`curly`、`semi` 等基础规则开启（当前为 `warn`）
 	- 避免抛出非 Error（`no-throw-literal`）
-- 日志/提示：面向用户的反馈使用 `vscode.window.showInformationMessage/showWarningMessage`；调试信息可用 `console.log`，但发布版本建议保持克制。
+- 日志/提示：面向用户的反馈使用 `vscode.window.showInformationMessage/showWarningMessage`；调试日志写入 VS Code Output（LogOutputChannel），默认关闭，仅在 `GIT_ORIGINAL_AUTHOR_HEADER_DEBUG=1` 时输出。
 - 与 Git 命令相关的字符串拼接必须考虑路径与引号转义（避免破坏命令行参数）。
+
+### Comments & Docs
+- 文件头 `@Description`：一句话说明文件职责（必要时最多再补一句边界）。
+- 函数注释：导出函数/关键 helper 必须有详细 JSDoc，包含意图、参数含义与约束、返回值、兜底/边界行为。
+- 函数内注释：尽量少写，仅在非直观逻辑（例如 Git 命令转义、时间兜底规则）处解释“为什么”。
+- 变量注释：优先 `//` 且尽量 1 行内，说明格式/单位/来源/约束，避免复述代码本身。
 
 文件头模板约定（当前实现）：
 - 使用 HTML 注释块 `<!-- ... -->` 插入到文件第一行
