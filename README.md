@@ -2,9 +2,14 @@
 
 这是一个 VS Code 扩展，用于在文件中插入“Git 原始作者信息”的文件头注释。
 
-默认会插入一个 `<!-- -->` 注释块，包含 `@Author` / `@Date` / `@LastEditors` / `@LastEditTime` 等字段。
+会根据文件类型自动选择合适的注释方式（例如 TS/JS 用 `/* */`，Python 用 `#`，HTML/Markdown 用 `<!-- -->`），并插入包含 `@Author` / `@Date` / `@LastEditors` / `@LastEditTime` 等字段的文件头。
 
 # 更新日志
+
+## [0.0.3] - 2026-01-18
+
+### 变更
+- 根据文件类型选择注释风格（可通过设置覆盖）
 
 ## [0.0.2] - 2026-01-18
 
@@ -55,6 +60,39 @@
 
 ## 配置
 
-暂无特殊配置。
+支持通过 VS Code Settings 覆盖“按文件类型选择注释方式”的规则。
+
+### 设置项
+
+- `git-original-author-header.commentStyleByLanguage`
+	- 按 `languageId` 覆盖注释风格。
+	- 可选值：`htmlBlock` / `cBlock` / `slashLine` / `hashLine` / `powershellBlock` / `luaBlock`
+- `git-original-author-header.commentStyleByExtension`
+	- 按文件扩展名覆盖注释风格，key 可用 `.ts` 或 `ts`。
+- `git-original-author-header.unknownFileBehavior`
+	- 无法识别注释方式时的行为：
+		- `prompt`：弹窗让你选择一种注释方式
+		- `skip`：跳过插入并提示（默认，避免破坏文件）
+		- `fallback`：使用默认块注释（`cBlock`）继续插入
+
+### 示例：settings.json
+
+```json
+{
+	"git-original-author-header.commentStyleByLanguage": {
+		"typescript": "cBlock",
+		"python": "hashLine"
+	},
+	"git-original-author-header.commentStyleByExtension": {
+		".vue": "htmlBlock",
+		"proto": "slashLine"
+	},
+	"git-original-author-header.unknownFileBehavior": "prompt"
+}
+```
+
+### 注意
+
+- 对严格 `json`（不支持注释）的文件，扩展会默认跳过插入并提示你改用 `jsonc` 或在设置中明确指定规则。
 
 ## 许可证
