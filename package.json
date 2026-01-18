@@ -2,7 +2,7 @@
   "name": "insertGitOriginalHeader",
   "displayName": "git-original-author-header",
   "description": "获取git原始作者，用来放到文件注释上",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "engines": {
     "vscode": "^1.108.1"
   },
@@ -20,6 +20,53 @@
         "title": "插入Git原始作者文件头"
       }
     ],
+    "configuration": {
+      "title": "git-original-author-header",
+      "properties": {
+        "git-original-author-header.commentStyleByLanguage": {
+          "type": "object",
+          "default": {},
+          "description": "按 languageId 覆盖文件头注释风格映射（示例：{ \"python\": \"hashLine\", \"typescript\": \"cBlock\" }）。",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "htmlBlock",
+              "cBlock",
+              "slashLine",
+              "hashLine",
+              "powershellBlock",
+              "luaBlock"
+            ]
+          }
+        },
+        "git-original-author-header.commentStyleByExtension": {
+          "type": "object",
+          "default": {},
+          "description": "按文件扩展名覆盖文件头注释风格映射（key 可用 .ts 或 ts）。",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "htmlBlock",
+              "cBlock",
+              "slashLine",
+              "hashLine",
+              "powershellBlock",
+              "luaBlock"
+            ]
+          }
+        },
+        "git-original-author-header.unknownFileBehavior": {
+          "type": "string",
+          "enum": [
+            "prompt",
+            "skip",
+            "fallback"
+          ],
+          "default": "skip",
+          "description": "无法识别注释方式时的行为：prompt=弹窗选择，skip=跳过并提示，fallback=使用默认块注释（cBlock）。"
+        }
+      }
+    },
     "menus": {
       "editor/context": [
         {

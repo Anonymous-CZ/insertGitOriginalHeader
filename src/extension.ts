@@ -3,11 +3,22 @@ import { exec } from 'child_process'; // 用于执行Git命令
 import { promisify } from 'util'; // 将回调函数转为Promise
 import { stat } from 'fs/promises';
 import { formatLocalDateTime, parseLocalDateTimeString, pickEarliestDate } from './dateTime';
+import { getUnknownFileBehavior, resolveCommentStyle, type CommentStyle, type CommentStyleConfig, type UnknownFileBehavior } from './commentStyle';
+import { renderHeaderBodyLines, wrapWithComment } from './header';
 const execAsync = promisify(exec); // 异步执行命令
 // 新增：定义一个接口来规范返回的数据结构
 interface GitCommitInfo {
 	author: string;
 	date: string; // 格式化为 'YYYY-MM-DD HH:mm:ss'
+}
+
+function readCommentStyleConfig(): CommentStyleConfig {
+	const config = vscode.workspace.getConfiguration('git-original-author-header');
+	return {
+		commentStyleByLanguage: config.get<Record<string, CommentStyle>>('commentStyleByLanguage'),
+		commentStyleByExtension: config.get<Record<string, CommentStyle>>('commentStyleByExtension'),
+		unknownFileBehavior: config.get<UnknownFileBehavior>('unknownFileBehavior'),
+	};
 }
 
 async function getFileBirthTime(filePath: string): Promise<Date | null> {
@@ -54,6 +65,40 @@ export function activate(context: vscode.ExtensionContext) {
 
 		const document = editor.document;
 		const filePath = document.fileName;
+		const languageId = document.languageId;
+		const commentStyleConfig = readCommentStyleConfig();
+		const resolved = resolveCommentStyle({ languageId, fileName: filePath, config: commentStyleConfig });
+		if (resolved.reason === 'noCommentLanguage') {
+			vscode.window.showWarningMessage('该文件类型不支持注释（例如 JSON）。已跳过插入文件头。你可以在设置中为该类型指定注释风格，或改用支持注释的语言模式（如 JSONC）。');
+			return;
+		}
+		let chosenCommentStyle = resolved.style;
+		if (!chosenCommentStyle) {
+			const unknownBehavior = getUnknownFileBehavior(commentStyleConfig);
+			if (unknownBehavior === 'skip') {
+				vscode.window.showWarningMessage(`无法判断该文件的注释方式（languageId=${languageId}）。已跳过插入；可在设置中配置 commentStyleByLanguage/commentStyleByExtension。`);
+				return;
+			}
+			if (unknownBehavior === 'fallback') {
+				chosenCommentStyle = 'cBlock';
+			} else {
+				const picked = await vscode.window.showQuickPick(
+					[
+						{ label: 'C 块注释', description: '/* ... */', style: 'cBlock' as const },
+						{ label: 'HTML 注释', description: '<!-- ... -->', style: 'htmlBlock' as const },
+						{ label: '双斜杠行注释', description: '// ...', style: 'slashLine' as const },
+						{ label: '井号行注释', description: '# ...', style: 'hashLine' as const },
+						{ label: 'PowerShell 块注释', description: '<# ... #>', style: 'powershellBlock' as const },
+						{ label: 'Lua 块注释', description: '--[[ ... ]]', style: 'luaBlock' as const },
+					],
+					{ title: '无法自动识别注释方式，请选择一种用于插入文件头' }
+				);
+				if (!picked) {
+					return;
+				}
+				chosenCommentStyle = picked.style;
+			}
+		}
 		// 获取原始提交信息（作者 + 时间）
 		const originalCommitInfo = await getOriginalGitCommitInfo(filePath);
 		const originalAuthor = originalCommitInfo.author;
@@ -78,16 +123,15 @@ export function activate(context: vscode.ExtensionContext) {
 		// 获取文件路径
 		const relativeFilePath = vscode.workspace.asRelativePath(filePath);
 
-		// 构建注释模板 - @Date 使用“Git原始提交时间 vs 文件创建时间”的最早值
-		const header = `<!--
- * @Author: ${originalAuthor}
- * @Date: ${chosenDateString}
- * @LastEditors: ${lastEditor}
- * @LastEditTime: ${currentDateTime}
- * @FilePath: ${relativeFilePath}
- * @Description: 
--->
-`;
+		const headerLines = renderHeaderBodyLines({
+			author: originalAuthor,
+			date: chosenDateString,
+			lastEditors: lastEditor,
+			lastEditTime: currentDateTime,
+			filePath: relativeFilePath,
+			description: '',
+		});
+		const header = wrapWithComment(chosenCommentStyle, headerLines) + '\n';
 
 		// 将文件头插入到编辑器的最顶部
 		editor.edit(editBuilder => {
