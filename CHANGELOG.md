@@ -6,4 +6,5 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-- Initial release
+- 按文件类型选择注释风格插入文件头（TS/JS 使用 `/* */`，Python/Shell 使用 `#`，HTML/Markdown 使用 `<!-- -->`）。
+- 新增配置项：`commentStyleByLanguage` / `commentStyleByExtension` / `unknownFileBehavior`。
