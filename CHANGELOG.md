@@ -12,3 +12,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [0.0.4] - 2026-01-18
 
 - 当文件未被 Git 跟踪或无 Git 历史时，`@Author` 回退为当前 Git 用户名（`git config user.name`）。
+
+## [0.0.5] - 2026-01-18
+
+- `@FilePath` 改为从项目根目录开始，且始终以 `/` 开头并使用 `/` 分隔符（例如 `/insertGitOriginalHeader/src/extension.ts`）。

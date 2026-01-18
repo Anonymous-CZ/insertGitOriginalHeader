@@ -11,6 +11,7 @@ import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { stat } from 'fs/promises';
+import { formatProjectRootFilePath } from './filePath';
 import { formatLocalDateTime, parseLocalDateTimeString, pickEarliestDate } from './dateTime';
 import { getUnknownFileBehavior, resolveCommentStyle, type CommentStyle, type CommentStyleConfig, type UnknownFileBehavior } from './commentStyle';
 import { renderHeaderBodyLines, wrapWithComment } from './header';
@@ -186,7 +187,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		const lastEditor = currentGitUserName || 'Current User';
 		const currentDateTime = formatLocalDateTime(new Date());
-		const relativeFilePath = vscode.workspace.asRelativePath(filePath);
+		const relativeFilePath = formatProjectRootFilePath(filePath);
 
 		const headerLines = renderHeaderBodyLines({
 			author: originalAuthor,

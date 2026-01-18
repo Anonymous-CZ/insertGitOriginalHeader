@@ -6,11 +6,16 @@
 
 # 更新日志
 
+## [0.0.5] - 2026-01-18
+
+### 变更
+- `@FilePath` 改为从项目根目录开始，且始终以 `/` 开头并使用 `/` 分隔符（例如 `/insertGitOriginalHeader/src/extension.ts`）。
+
 ## [0.0.4] - 2026-01-18
 
 ### 变更
 - 当文件未被 Git 跟踪或无 Git 历史时，`@Author` 回退为当前 Git 用户名（`git config user.name`）。
-- 
+
 ## [0.0.3] - 2026-01-18
 
 ### 变更
@@ -43,6 +48,8 @@
 	- 文件创建时间（Node.js `fs.stat(...).birthtime`，若可用）
 - `@LastEditors`：读取 `git config user.name`（获取失败则使用默认值）。
 - `@LastEditTime`：插入文件头时的当前时间。
+- `@FilePath`：从项目根目录开始的路径，始终以 `/` 开头，且使用 `/` 作为分隔符（Windows 也一样）。
+	- 示例：`/insertGitOriginalHeader/src/extension.ts`
 
 ## 使用方法
 
