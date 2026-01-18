@@ -2,7 +2,7 @@
   "name": "insertGitOriginalHeader",
   "displayName": "git-original-author-header",
   "description": "获取git原始作者，用来放到文件注释上",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "engines": {
     "vscode": "^1.108.1"
   },

@@ -5,11 +5,21 @@ import { stat } from 'fs/promises';
 import { formatLocalDateTime, parseLocalDateTimeString, pickEarliestDate } from './dateTime';
 import { getUnknownFileBehavior, resolveCommentStyle, type CommentStyle, type CommentStyleConfig, type UnknownFileBehavior } from './commentStyle';
 import { renderHeaderBodyLines, wrapWithComment } from './header';
+import { pickAuthor } from './author';
 const execAsync = promisify(exec); // 异步执行命令
 // 新增：定义一个接口来规范返回的数据结构
 interface GitCommitInfo {
 	author: string;
 	date: string; // 格式化为 'YYYY-MM-DD HH:mm:ss'
+}
+
+async function getCurrentGitUserName(): Promise<string> {
+	try {
+		const { stdout } = await execAsync('git config user.name', { cwd: vscode.workspace.rootPath });
+		return stdout.trim();
+	} catch {
+		return '';
+	}
 }
 
 function readCommentStyleConfig(): CommentStyleConfig {
@@ -40,15 +50,26 @@ async function getOriginalGitCommitInfo(filePath: string): Promise<GitCommitInfo
 		const command = `git --no-pager log --reverse --pretty=format:"%an|||%ad" --date=format:"%Y-%m-%d %H:%M:%S" -1 -- "${filePath.replace(/"/g, '\\"')}"`;
 
 		exec(command, { cwd: vscode.workspace.rootPath }, (error, stdout, stderr) => {
-			if (stdout && stdout.trim()) {
-				const [author, date] = stdout.trim().split('|||');
-				console.log(`成功获取原始提交信息 - 作者: ${author}, 时间: ${date}`);
-				resolve({ author: author || 'Unknown', date: date || 'Unknown Date' });
-			} else {
-				console.error('无法获取原始提交信息:', error?.message || stderr);
-					// Git 时间不可用时，让后续逻辑回退到文件创建时间；两者都不可用时再使用兜底时间。
-					resolve({ author: 'Unknown Author', date: '' });
+			const trimmed = stdout?.trim() ?? '';
+			if (trimmed) {
+				const delimiter = '|||';
+				const delimiterIndex = trimmed.indexOf(delimiter);
+				if (delimiterIndex >= 0) {
+					const author = trimmed.slice(0, delimiterIndex).trim();
+					const date = trimmed.slice(delimiterIndex + delimiter.length).trim();
+					console.log(`成功获取原始提交信息 - 作者: ${author}, 时间: ${date}`);
+					resolve({ author, date });
+					return;
+				}
+
+				// Unexpected format; still return something sane.
+				resolve({ author: trimmed, date: '' });
+				return;
 			}
+
+			console.error('无法获取原始提交信息:', error?.message || stderr);
+			// 对未跟踪/无历史文件，stdout 为空：让后续逻辑做兜底选择。
+			resolve({ author: '', date: '' });
 		});
 	});
 }
@@ -99,9 +120,14 @@ export function activate(context: vscode.ExtensionContext) {
 				chosenCommentStyle = picked.style;
 			}
 		}
+		const currentGitUserName = await getCurrentGitUserName();
+
 		// 获取原始提交信息（作者 + 时间）
 		const originalCommitInfo = await getOriginalGitCommitInfo(filePath);
-		const originalAuthor = originalCommitInfo.author;
+		const originalAuthor = pickAuthor({
+			gitOriginalAuthor: originalCommitInfo.author,
+			currentGitUserName,
+		});
 		const gitOriginalDateString = originalCommitInfo.date;
 		const gitOriginalDate = parseLocalDateTimeString(gitOriginalDateString);
 
@@ -110,13 +136,7 @@ export function activate(context: vscode.ExtensionContext) {
 		const chosenDateString = formatLocalDateTime(chosenDate);
 
 		// 获取当前用户和当前时间
-		let lastEditor = 'Current User';
-		try {
-			const { stdout } = await execAsync('git config user.name', { cwd: vscode.workspace.rootPath });
-			lastEditor = stdout.trim();
-		} catch (error) {
-			// 如果获取失败，就使用默认值
-		}
+		const lastEditor = currentGitUserName || 'Current User';
 
 		const currentDateTime = formatLocalDateTime(new Date());
 

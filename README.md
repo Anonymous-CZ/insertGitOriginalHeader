@@ -6,6 +6,11 @@
 
 # 更新日志
 
+## [0.0.4] - 2026-01-18
+
+### 变更
+- 当文件未被 Git 跟踪或无 Git 历史时，`@Author` 回退为当前 Git 用户名（`git config user.name`）。
+- 
 ## [0.0.3] - 2026-01-18
 
 ### 变更
@@ -32,7 +37,7 @@
 
 ## 字段说明
 
-- `@Author`：通过 `git log --reverse ... -1` 获取当前文件的最早提交作者（`%an`）。
+- `@Author`：优先通过 `git log --reverse ... -1` 获取当前文件的最早提交作者（`%an`）。若文件未被 Git 跟踪或无历史导致获取失败，则回退为 `git config user.name`。
 - `@Date`：取两者中更早者（格式 `YYYY-MM-DD HH:mm:ss`）：
 	- Git 最早提交时间（`%ad`，本地时间格式化）
 	- 文件创建时间（Node.js `fs.stat(...).birthtime`，若可用）
