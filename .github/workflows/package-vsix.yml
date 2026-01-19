@@ -1,6 +1,5 @@
 name: Package VSIX
 
-
 on:
   workflow_dispatch:
   push:
@@ -37,9 +36,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      - name: 安装依赖 (灵活处理锁文件)
+      - name: 安装依赖
         run: |
-          # 检查锁文件是否存在
           if [ -f pnpm-lock.yaml ]; then
             echo "找到 pnpm-lock.yaml，使用冻结锁文件安装"
             pnpm install --frozen-lockfile
@@ -48,16 +46,11 @@ jobs:
             pnpm install
           fi
 
-      - name: 构建并打包 (package 脚本)
-        run: |
-          pnpm run prepackage-vsix
-          pnpm run package-vsix
-
-      - name: 生成 VSIX 文件 (vsix 脚本)
-        run: pnpm run vsix
+      - name: 执行单一打包命令
+        run: pnpm run package-vsix
 
       - name: 上传 VSIX 作为构件
         uses: actions/upload-artifact@v4
         with:
-          name: extension-vsix-v${{ github.ref_name }}
+          name: extension-vsix
           path: '*.vsix'
