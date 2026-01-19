@@ -1,5 +1,6 @@
 name: Package VSIX
 
+
 on:
   workflow_dispatch:
   push:
@@ -48,7 +49,9 @@ jobs:
           fi
 
       - name: 构建并打包 (package 脚本)
-        run: pnpm run package
+        run: |
+          pnpm run prepackage-vsix
+          pnpm run package-vsix
 
       - name: 生成 VSIX 文件 (vsix 脚本)
         run: pnpm run vsix
