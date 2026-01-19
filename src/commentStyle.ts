@@ -2,8 +2,8 @@
  * @Author: Anonymous-CZ
  * @Date: 2026-01-18 13:29:07
  * @LastEditors: Anonymous-CZ
- * @LastEditTime: 2026-01-18 15:27:43
- * @FilePath: src/commentStyle.ts
+ * @LastEditTime: 2026-01-19 14:58:57
+ * @FilePath: /insertGitOriginalHeader/src/commentStyle.ts
  * @Description: 根据语言/扩展名解析注释风格，并提供默认映射与兜底策略。
  */
 
@@ -103,6 +103,7 @@ const DEFAULT_STYLE_BY_EXTENSION: Record<string, CommentStyle> = {
 	'.markdown': 'htmlBlock',
 	'.xml': 'htmlBlock',
 	'.svg': 'htmlBlock',
+	'.vue': 'htmlBlock',
 
 	// C-like
 	'.js': 'cBlock',
