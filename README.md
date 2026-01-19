@@ -1,10 +1,14 @@
 # Git Original Author Header
 
-这是一个 VS Code 扩展，用于在文件中插入“Git 原始作者信息”的文件头注释。
+这是一个用于补充 koroFileHeader 的 VS Code 扩展：当你需要为他人提交的文件补充文件头注释时，koroFileHeader 无法直接获取“该文件最早提交的作者/时间”，手动查询与补齐会很麻烦。
+
+本扩展通过读取 Git 历史，自动获取文件的原始提交作者与时间，并将其写入文件头注释，让补注释这件事变得更省事。
 
 会根据文件类型自动选择合适的注释方式（例如 TS/JS 用 `/* */`，Python 用 `#`，HTML/Markdown 用 `<!-- -->`），并插入包含 `@Author` / `@Date` / `@LastEditors` / `@LastEditTime` 等字段的文件头。
 
 # 更新日志
+
+完整更新日志请查看 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## [0.0.6] - 2026-01-19
 
@@ -113,3 +117,13 @@
 - 对严格 `json`（不支持注释）的文件，扩展会默认跳过插入并提示你改用 `jsonc` 或在设置中明确指定规则。
 
 ## 许可证
+
+本项目使用 MIT License，详见 [LICENSE](./LICENSE)。
+
+相关文档：
+
+- 贡献指南：[CONTRIBUTING.md](./CONTRIBUTING.md)
+- 行为准则：[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- 安全政策：[SECURITY.md](./SECURITY.md)
+- 支持与反馈：[SUPPORT.md](./SUPPORT.md)
+- 发布流程：[RELEASING.md](./RELEASING.md)
