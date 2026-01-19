@@ -1,7 +1,17 @@
 {
   "name": "insertGitOriginalHeader",
   "displayName": "git-original-author-header",
-  "description": "获取git原始作者，用来放到文件注释上，koroFileHeader插件的插件",
+  "description": "用于补充 koroFileHeader 的 VS Code 插件：当需要为他人提交的文件补充文件头注释时，koroFileHeader 无法直接获取文件的原始提交作者会很麻烦；本插件通过 Git 历史自动获取原始作者与时间并插入文件头。",
+  "license": "MIT",
+  "author": "Anonymous-CZ",
+  "homepage": "https://github.com/Anonymous-CZ/insertGitOriginalHeader#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Anonymous-CZ/insertGitOriginalHeader.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Anonymous-CZ/insertGitOriginalHeader/issues"
+  },
   "version": "0.0.6",
   "engines": {
     "vscode": "^1.108.1"
@@ -93,6 +103,8 @@
     "test": "vscode-test"
   },
   "devDependencies": {
+    "eslint": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "@types/vscode": "^1.108.1",
