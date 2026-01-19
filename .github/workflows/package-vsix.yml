@@ -1,23 +1,28 @@
-name: Package VSIX
+name: Package and Release VSIX
 
 on:
-  # 移除 workflow_dispatch（手动触发）和 push/pull_request 条件
   push:
     tags:
-      - 'v*.*.*'  # 只监听符合版本号格式的标签，如 v1.0.0
+      - 'v*.*.*'
 
 jobs:
   package:
     runs-on: ubuntu-latest
-    # 添加环境变量，确保vsce使用正确的工作目录
     env:
       VSCE_TRUSTED_WORKSPACES: 'true'
+    
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
     
     steps:
       - name: 检出代码（包含标签信息）
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整历史，对插件功能很重要
+          fetch-depth: 0
+
+      - name: 提取版本号（不含v前缀）
+        id: extract_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: 设置 Node.js 环境
         uses: actions/setup-node@v4
@@ -49,8 +54,43 @@ jobs:
       - name: 执行单一打包命令
         run: pnpm run package-vsix
 
-      - name: 上传 VSIX 作为构件
+      - name: 上传 VSIX 作为构件（临时存储）
         uses: actions/upload-artifact@v4
         with:
-          name: extension-vsix-${{ github.ref_name }}  # 使用标签名，如 v1.0.0
+          name: extension-vsix
           path: '*.vsix'
+
+  create-release:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 关键：需要写入权限来创建Release
+    
+    steps:
+      - name: 下载 VSIX 构件
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-vsix
+          
+      - name: 创建 GitHub Release 并上传 VSIX
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release v${{ needs.package.outputs.version }}
+          tag_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+          files: |
+            *.vsix
+          body: |
+            ## 版本 ${{ needs.package.outputs.version }}
+            
+            ### 更新说明
+            
+            ### 安装方式
+            1. 下载下方的 `.vsix` 文件
+            2. 在 VSCode 中运行 "Extensions: Install from VSIX..."
+            3. 选择下载的 `.vsix` 文件
+            
+            ### 校验信息
+            - 构建时间: ${{ github.event.head_commit.timestamp }}
+            - 提交: ${{ github.sha }}
