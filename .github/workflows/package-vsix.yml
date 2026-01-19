@@ -1,11 +1,10 @@
 name: Package VSIX
 
 on:
-  workflow_dispatch: # 允许在GitHub网页手动触发
+  workflow_dispatch:
   push:
     branches: [ main ]
-    tags:
-      - 'v*.*.*' # 推送版本标签时也自动打包
+    tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ main ]
 
@@ -16,39 +15,43 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 关键：获取完整的Git历史，保证你的插件能正确读取历史提交信息
+          fetch-depth: 0 # 关键：为你的插件功能获取完整Git历史
 
       - name: 设置 Node.js 环境
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # 注意：移除了这里的 cache 配置，pnpm 还没安装
 
       - name: 安装 pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: latest # 或指定具体版本，如 '9'
+          version: latest
           run_install: false
 
-      - name: 配置 pnpm 缓存（加速）
+      - name: 配置 pnpm 缓存
         uses: actions/cache@v4
         with:
           path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      - name: 安装依赖
-        run: pnpm install --frozen-lockfile # 根据你的 lockfile 安装确定版本的依赖
+      - name: 安装依赖 (灵活处理锁文件)
+        run: |
+          # 检查锁文件是否存在
+          if [ -f pnpm-lock.yaml ]; then
+            echo "找到 pnpm-lock.yaml，使用冻结锁文件安装"
+            pnpm install --frozen-lockfile
+          else
+            echo "未找到 pnpm-lock.yaml，生成新的锁文件"
+            pnpm install
+          fi
 
       - name: 构建并打包 (package 脚本)
-        run: pnpm run package # 执行你的package脚本，它会执行检查、构建
+        run: pnpm run package
 
       - name: 生成 VSIX 文件 (vsix 脚本)
-        run: pnpm run vsix # 调用 vsce package 生成 .vsix 文件
-
-      - name: 检查并列出生成的 VSIX 文件
-        run: ls -la *.vsix || echo "未找到.vsix文件"
+        run: pnpm run vsix
 
       - name: 上传 VSIX 作为构件
         uses: actions/upload-artifact@v4
