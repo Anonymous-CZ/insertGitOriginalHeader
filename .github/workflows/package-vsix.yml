@@ -1,21 +1,23 @@
 name: Package VSIX
 
 on:
-  workflow_dispatch:
+  # 移除 workflow_dispatch（手动触发）和 push/pull_request 条件
   push:
-    branches: [ main ]
-    tags: [ 'v*.*.*' ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - 'v*.*.*'  # 只监听符合版本号格式的标签，如 v1.0.0
 
 jobs:
   package:
     runs-on: ubuntu-latest
+    # 添加环境变量，确保vsce使用正确的工作目录
+    env:
+      VSCE_TRUSTED_WORKSPACES: 'true'
+    
     steps:
-      - name: 检出代码
+      - name: 检出代码（包含标签信息）
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 关键：为你的插件功能获取完整Git历史
+          fetch-depth: 0  # 获取完整历史，对插件功能很重要
 
       - name: 设置 Node.js 环境
         uses: actions/setup-node@v4
@@ -39,10 +41,8 @@ jobs:
       - name: 安装依赖
         run: |
           if [ -f pnpm-lock.yaml ]; then
-            echo "找到 pnpm-lock.yaml，使用冻结锁文件安装"
             pnpm install --frozen-lockfile
           else
-            echo "未找到 pnpm-lock.yaml，生成新的锁文件"
             pnpm install
           fi
 
@@ -52,5 +52,5 @@ jobs:
       - name: 上传 VSIX 作为构件
         uses: actions/upload-artifact@v4
         with:
-          name: extension-vsix
+          name: extension-vsix-${{ github.ref_name }}  # 使用标签名，如 v1.0.0
           path: '*.vsix'
