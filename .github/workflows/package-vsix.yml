@@ -71,6 +71,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: extension-vsix
+          path: out
+          
+      - name: 显示下载的文件列表
+        run: ls -la out/
           
       - name: 创建 GitHub Release 并上传 VSIX
         uses: softprops/action-gh-release@v1
