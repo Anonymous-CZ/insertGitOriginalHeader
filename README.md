@@ -10,12 +10,6 @@
 
 完整更新日志请查看 [CHANGELOG.md](./CHANGELOG.md)。
 
-## [0.0.1] - 2026-01-18
-
-### 新增
-- 初始版本发布
-- 添加插入 Git 原始作者文件头功能
-
 ## 功能
 
 - 获取当前文件的 Git 原始作者信息
@@ -49,6 +43,12 @@
 在仓库根目录执行：
 
 - `pnpm install`
+- 推荐：`pnpm run package-vsix`
+	- 产物输出到 `out/`，文件名包含版本号（例如 `out/git-original-author-header-1.0.3.vsix`）
+	- CI（tag 发布）会用 tag 版本号覆盖该版本号
+
+也可以使用：
+
 - `pnpm run vsix`
 
 生成的 `.vsix` 文件可用于“从 VSIX 安装”。

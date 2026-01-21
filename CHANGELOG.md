@@ -6,6 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-01-21
+
+- 构建：`pnpm run package-vsix` 生成包含版本号的 VSIX（输出到 `out/`）。
+- CI：GitHub Release 附件上传 `out/*.vsix`，文件名包含 tag 版本号。
+
 ## [1.0.2] - 2026-01-21
 
 - 修复：文件发生重命名后仍能正确追溯最早作者/时间（`git log --follow`）。

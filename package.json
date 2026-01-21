@@ -13,7 +13,7 @@
   "bugs": {
     "url": "https://github.com/Anonymous-CZ/insertGitOriginalHeader/issues"
   },
-  "version": "1.0.2",
+  "version": "1.0.3",
   "engines": {
     "vscode": "^1.108.1"
   },
@@ -96,7 +96,7 @@
     "package": "pnpm run check-types && node esbuild.js --production",
     "vsix": "pnpm run package && vsce package",
     "prepackage-vsix": "pnpm pack --pack-destination ./out",
-    "package-vsix": "node esbuild.js --production && vsce package --no-dependencies --out ./out/extension.vsix",
+    "package-vsix": "node scripts/package-vsix.js",
     "publish": "pnpm run vsix",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",

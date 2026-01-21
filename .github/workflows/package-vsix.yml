@@ -52,13 +52,13 @@ jobs:
           fi
 
       - name: 执行单一打包命令
-        run: pnpm run package-vsix
+        run: VSIX_VERSION=${{ steps.extract_version.outputs.version }} pnpm run package-vsix
 
       - name: 上传 VSIX 作为构件（临时存储）
         uses: actions/upload-artifact@v4
         with:
           name: extension-vsix
-          path: '*.vsix'
+          path: out/*.vsix
 
   create-release:
     needs: package
@@ -80,7 +80,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            *.vsix
+            out/*.vsix
           body: |
             ## 版本 ${{ needs.package.outputs.version }}
             
