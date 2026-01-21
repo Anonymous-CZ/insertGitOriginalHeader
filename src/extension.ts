@@ -2,13 +2,13 @@
  * @Author: Anonymous-CZ
  * @Date: 2026-01-18 13:30:06
  * @LastEditors: Anonymous-CZ
- * @LastEditTime: 2026-01-18 15:27:52
- * @FilePath: src/extension.ts
+ * @LastEditTime: 2026-01-21 15:44:18
+ * @FilePath: /insertGitOriginalHeader/src/extension.ts
  * @Description: VS Code 扩展入口：获取 Git 原始作者/时间并按注释风格插入文件头。
  */
 
 import * as vscode from 'vscode';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { stat } from 'fs/promises';
 import { formatProjectRootFilePath } from './filePath';
@@ -16,8 +16,9 @@ import { formatLocalDateTime, parseLocalDateTimeString, pickEarliestDate } from 
 import { getUnknownFileBehavior, resolveCommentStyle, type CommentStyle, type CommentStyleConfig, type UnknownFileBehavior } from './commentStyle';
 import { renderHeaderBodyLines, wrapWithComment } from './header';
 import { pickAuthor } from './author';
+import { buildGitOriginalCommitArgs, parseGitOriginalCommitStdout, toGitPathSpec, type GitCommitInfo } from './gitOriginalCommit';
 
-const execAsync = promisify(exec); // Promise 版 exec：用于运行 git 命令
+const execFileAsync = promisify(execFile);
 const DEBUG_LOG_ENABLED = process.env.GIT_ORIGINAL_AUTHOR_HEADER_DEBUG === '1'; // 设为 "1" 时输出调试日志
 
 let logChannel: vscode.LogOutputChannel | undefined;
@@ -33,9 +34,21 @@ function logWarn(message: string, ...optionalParams: unknown[]): void {
 	logChannel?.warn(message, ...optionalParams);
 }
 
-interface GitCommitInfo {
-	author: string;
-	date: string; // `YYYY-MM-DD HH:mm:ss`
+function getGitCwdForUri(targetUri: vscode.Uri | undefined): string | undefined {
+	if (targetUri && targetUri.scheme === 'file') {
+		const folder = vscode.workspace.getWorkspaceFolder(targetUri);
+		if (folder) {
+			return folder.uri.fsPath;
+		}
+	}
+
+	const firstFolder = vscode.workspace.workspaceFolders?.[0];
+	if (firstFolder) {
+		return firstFolder.uri.fsPath;
+	}
+
+	// Back-compat for older VS Code APIs / older workspace shapes
+	return vscode.workspace.rootPath ?? undefined;
 }
 
 /**
@@ -43,9 +56,9 @@ interface GitCommitInfo {
  *
  * @returns 获取失败返回空字符串（上层决定兜底文案）
  */
-async function getCurrentGitUserName(): Promise<string> {
+async function getCurrentGitUserName(documentUri: vscode.Uri): Promise<string> {
 	try {
-		const { stdout } = await execAsync('git config user.name', { cwd: vscode.workspace.rootPath });
+		const { stdout } = await execFileAsync('git', ['config', 'user.name'], { cwd: getGitCwdForUri(documentUri) });
 		return stdout.trim();
 	} catch {
 		return '';
@@ -89,31 +102,23 @@ async function getFileBirthTime(filePath: string): Promise<Date | null> {
  * - 对未跟踪/无历史文件，git log 输出为空，函数返回空字符串字段（由上层做兜底）。
  * - 时间格式固定为本地字符串 `YYYY-MM-DD HH:mm:ss`。
  */
-async function getOriginalGitCommitInfo(filePath: string): Promise<GitCommitInfo> {
+async function getOriginalGitCommitInfo(input: { filePath: string; documentUri: vscode.Uri }): Promise<GitCommitInfo> {
 	return new Promise((resolve) => {
-		const command = `git --no-pager log --reverse --pretty=format:"%an|||%ad" --date=format:"%Y-%m-%d %H:%M:%S" -1 -- "${filePath.replace(/"/g, '\\"')}"`;
+		const cwd = getGitCwdForUri(input.documentUri);
+		const pathSpec = cwd ? toGitPathSpec(input.filePath, cwd) : input.filePath;
+		const args = buildGitOriginalCommitArgs(pathSpec, { followRenames: true });
+		logDebug('Executing git command:', ['git', ...args].join(' '));
 
-		exec(command, { cwd: vscode.workspace.rootPath }, (error, stdout, stderr) => {
-			const trimmed = stdout?.trim() ?? '';
-			if (trimmed) {
-				const delimiter = '|||';
-				const delimiterIndex = trimmed.indexOf(delimiter);
-				if (delimiterIndex >= 0) {
-					const author = trimmed.slice(0, delimiterIndex).trim();
-					const date = trimmed.slice(delimiterIndex + delimiter.length).trim();
-					logDebug(`成功获取原始提交信息 - 作者: ${author}, 时间: ${date}`);
-					resolve({ author, date });
-					return;
-				}
-
-				// Unexpected format; still return something sane.
-				resolve({ author: trimmed, date: '' });
+		execFile('git', args, { cwd }, (error, stdout, stderr) => {
+			const parsed = parseGitOriginalCommitStdout(stdout ?? '');
+			if (parsed.author || parsed.date) {
+				logDebug(`成功获取原始提交信息 - 作者: ${parsed.author}, 时间: ${parsed.date}`);
+				resolve(parsed);
 				return;
 			}
 
 			// 常见原因：文件未纳入 Git 追踪/无历史。这里只记录到 Output 面板，功能仍按空值兜底继续。
 			logWarn('无法获取原始提交信息（将使用兜底值）:', error?.message || stderr);
-			// 对未跟踪/无历史文件，stdout 为空：让后续逻辑做兜底选择。
 			resolve({ author: '', date: '' });
 		});
 	});
@@ -137,6 +142,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		const document = editor.document;
 		const filePath = document.fileName;
+		const documentUri = document.uri;
 		const languageId = document.languageId;
 		const commentStyleConfig = readCommentStyleConfig();
 		const resolved = resolveCommentStyle({ languageId, fileName: filePath, config: commentStyleConfig });
@@ -171,9 +177,9 @@ export function activate(context: vscode.ExtensionContext) {
 				chosenCommentStyle = picked.style;
 			}
 		}
-		const currentGitUserName = await getCurrentGitUserName();
+		const currentGitUserName = await getCurrentGitUserName(documentUri);
 
-		const originalCommitInfo = await getOriginalGitCommitInfo(filePath);
+		const originalCommitInfo = await getOriginalGitCommitInfo({ filePath, documentUri });
 		const originalAuthor = pickAuthor({
 			gitOriginalAuthor: originalCommitInfo.author,
 			currentGitUserName,

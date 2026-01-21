@@ -6,6 +6,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-01-21
+
+- 修复：文件发生重命名后仍能正确追溯最早作者/时间（`git log --follow`）。
+- 修复：多工作区（multi-root）下 Git 命令的执行目录选择错误（基于 `workspace.getWorkspaceFolder`）。
+- 修复：路径包含空格等字符时 Git 命令更稳定（改用 `execFile` 传参，避免 shell 拼接）。
+
 ## [0.0.6] - 2026-01-19
 
 - `.vue` 文件使用 HTML 块注释风格插入文件头。
