@@ -2,7 +2,7 @@
  * @Author: Anonymous-CZ
  * @Date: 2026-01-18 13:30:06
  * @LastEditors: Anonymous-CZ
- * @LastEditTime: 2026-01-21 15:44:18
+ * @LastEditTime: 2026-01-29 16:45:52
  * @FilePath: /insertGitOriginalHeader/src/extension.ts
  * @Description: VS Code 扩展入口：获取 Git 原始作者/时间并按注释风格插入文件头。
  */
@@ -158,7 +158,7 @@ export function activate(context: vscode.ExtensionContext) {
 				return;
 			}
 			if (unknownBehavior === 'fallback') {
-				chosenCommentStyle = 'cBlock';
+				chosenCommentStyle = 'htmlBlock';
 			} else {
 				const picked = await vscode.window.showQuickPick(
 					[
@@ -203,7 +203,7 @@ export function activate(context: vscode.ExtensionContext) {
 			filePath: relativeFilePath,
 			description: '',
 		});
-		const header = wrapWithComment(chosenCommentStyle, headerLines) + '\n';
+		const header = wrapWithComment(chosenCommentStyle, headerLines);
 
 		editor.edit(editBuilder => {
 			editBuilder.insert(new vscode.Position(0, 0), header);

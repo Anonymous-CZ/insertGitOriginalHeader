@@ -6,6 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-01-29
+
+- 优化：默认注释改为HTML注释；
+- 修复：插入文件头后多出空行的问题。
+
 ## [1.0.3] - 2026-01-21
 
 - 构建：`pnpm run package-vsix` 生成包含版本号的 VSIX（输出到 `out/`）。
