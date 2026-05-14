@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*.*.*'
 
+env:
+  # Opt into Node.js 24 for JavaScript-based GitHub Actions ahead of the runner default switch.
+  # This removes Node.js 20 deprecation warnings and surfaces incompatibilities early.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   package:
     runs-on: ubuntu-latest
@@ -16,7 +21,7 @@ jobs:
     
     steps:
       - name: 检出代码（包含标签信息）
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -25,18 +30,18 @@ jobs:
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: 设置 Node.js 环境
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
       - name: 安装 pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 8.7.1
           run_install: false
 
       - name: 配置 pnpm 缓存
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.pnpm-store
           key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -55,20 +60,22 @@ jobs:
         run: VSIX_VERSION=${{ steps.extract_version.outputs.version }} pnpm run package-vsix
 
       - name: 上传 VSIX 作为构件（临时存储）
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: extension-vsix
           path: out/*.vsix
+          if-no-files-found: error
 
   create-release:
     needs: package
     runs-on: ubuntu-latest
     permissions:
       contents: write  # 关键：需要写入权限来创建Release
+      actions: read    # 需要读取权限来下载 workflow artifacts
     
     steps:
       - name: 下载 VSIX 构件
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: extension-vsix
           path: out
@@ -77,7 +84,7 @@ jobs:
         run: ls -la out/
           
       - name: 创建 GitHub Release 并上传 VSIX
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           name: Release v${{ needs.package.outputs.version }}
           tag_name: ${{ github.ref }}
