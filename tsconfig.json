@@ -3,6 +3,9 @@
 		"module": "Node16",
 		"target": "ES2022",
 		"outDir": "./dist",  // 添加这一行
+		"types": [
+			"node"
+		],
 		"lib": [
 			"ES2022"
 		],

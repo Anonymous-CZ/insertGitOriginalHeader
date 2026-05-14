@@ -13,7 +13,7 @@
   "bugs": {
     "url": "https://github.com/Anonymous-CZ/insertGitOriginalHeader/issues"
   },
-  "version": "1.0.3",
+  "version": "1.1.3",
   "engines": {
     "vscode": "^1.108.1"
   },
@@ -21,7 +21,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:git-original-author-header.insertGitOriginalHeader"
+    "onCommand:git-original-author-header.insertGitOriginalHeader",
+    "onCommand:git-original-author-header.batchInsertMissingHeadersInFolder"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -29,6 +30,10 @@
       {
         "command": "git-original-author-header.insertGitOriginalHeader",
         "title": "插入Git原始作者文件头"
+      },
+      {
+        "command": "git-original-author-header.batchInsertMissingHeadersInFolder",
+        "title": "批量补充文件头注释"
       }
     ],
     "configuration": {
@@ -75,6 +80,80 @@
           ],
           "default": "skip",
           "description": "无法识别注释方式时的行为：prompt=弹窗选择，skip=跳过并提示，fallback=使用默认块注释（cBlock）。"
+        },
+        "git-original-author-header.batchConcurrency": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "批量补充文件头时的最大并发数，用于避免同时执行过多 Git/IO 操作。"
+        },
+        "git-original-author-header.batchExcludePatterns": {
+          "type": "array",
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/out/**",
+            "**/pnpm-lock.yaml",
+            "**/package-lock.json",
+            "**/yarn.lock"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "批量补充文件头时需要排除的 glob 模式。"
+        },
+        "git-original-author-header.batchIncludeExtensions": {
+          "type": "array",
+          "default": [
+            ".ts",
+            ".js",
+            ".jsx",
+            ".tsx",
+            ".py",
+            ".java",
+            ".go",
+            ".rs",
+            ".html",
+            ".css",
+            ".scss",
+            ".vue",
+            ".md",
+            ".xml",
+            ".yml",
+            ".yaml",
+            ".toml",
+            ".sh",
+            ".ps1"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "批量补充文件头时允许处理的文件扩展名白名单（为空表示不过滤扩展名）。"
+        },
+        "git-original-author-header.commentCheckLines": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "检测文件是否已有文件头注释时，读取并检查文件前 N 行。"
+        },
+        "git-original-author-header.skipBinaryFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "批量补充文件头时是否自动跳过二进制文件。"
+        },
+        "git-original-author-header.continueOnError": {
+          "type": "boolean",
+          "default": false,
+          "description": "批量处理过程中遇到失败时是否继续处理后续文件（false=遇到首个错误立即停止）。"
+        },
+        "git-original-author-header.generateReport": {
+          "type": "boolean",
+          "default": true,
+          "description": "批量处理结束后是否生成可复制的处理报告。"
         }
       }
     },
@@ -82,6 +161,13 @@
       "editor/context": [
         {
           "command": "git-original-author-header.insertGitOriginalHeader",
+          "group": "1_modification"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "git-original-author-header.batchInsertMissingHeadersInFolder",
+          "when": "explorerResourceIsFolder",
           "group": "1_modification"
         }
       ]
