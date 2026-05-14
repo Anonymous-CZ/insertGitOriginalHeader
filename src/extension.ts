@@ -2,22 +2,16 @@
  * @Author: Anonymous-CZ
  * @Date: 2026-01-18 13:30:06
  * @LastEditors: Anonymous-CZ
- * @LastEditTime: 2026-01-18 15:27:52
- * @FilePath: src/extension.ts
+ * @LastEditTime: 2026-05-14 11:06:00
+ * @FilePath: /insertGitOriginalHeader/src/extension.ts
  * @Description: VS Code 扩展入口：获取 Git 原始作者/时间并按注释风格插入文件头。
  */
 
 import * as vscode from 'vscode';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { stat } from 'fs/promises';
-import { formatProjectRootFilePath } from './filePath';
-import { formatLocalDateTime, parseLocalDateTimeString, pickEarliestDate } from './dateTime';
-import { getUnknownFileBehavior, resolveCommentStyle, type CommentStyle, type CommentStyleConfig, type UnknownFileBehavior } from './commentStyle';
-import { renderHeaderBodyLines, wrapWithComment } from './header';
-import { pickAuthor } from './author';
-
-const execAsync = promisify(exec); // Promise 版 exec：用于运行 git 命令
+import type { CommentStyle } from './commentStyle';
+import { readCommentStyleConfig } from './settings';
+import { insertGitOriginalHeaderForDocument } from './insertHeader';
+import { batchInsertMissingHeadersInFolder } from './batch/batchInsertMissingHeadersInFolder';
 const DEBUG_LOG_ENABLED = process.env.GIT_ORIGINAL_AUTHOR_HEADER_DEBUG === '1'; // 设为 "1" 时输出调试日志
 
 let logChannel: vscode.LogOutputChannel | undefined;
@@ -33,92 +27,6 @@ function logWarn(message: string, ...optionalParams: unknown[]): void {
 	logChannel?.warn(message, ...optionalParams);
 }
 
-interface GitCommitInfo {
-	author: string;
-	date: string; // `YYYY-MM-DD HH:mm:ss`
-}
-
-/**
- * 读取当前工作区 Git 用户名（git config user.name）。
- *
- * @returns 获取失败返回空字符串（上层决定兜底文案）
- */
-async function getCurrentGitUserName(): Promise<string> {
-	try {
-		const { stdout } = await execAsync('git config user.name', { cwd: vscode.workspace.rootPath });
-		return stdout.trim();
-	} catch {
-		return '';
-	}
-}
-
-/**
- * 从 VS Code Settings 读取注释风格配置。
- */
-function readCommentStyleConfig(): CommentStyleConfig {
-	const config = vscode.workspace.getConfiguration('git-original-author-header');
-	return {
-		commentStyleByLanguage: config.get<Record<string, CommentStyle>>('commentStyleByLanguage'),
-		commentStyleByExtension: config.get<Record<string, CommentStyle>>('commentStyleByExtension'),
-		unknownFileBehavior: config.get<UnknownFileBehavior>('unknownFileBehavior'),
-	};
-}
-
-/**
- * 获取文件系统记录的创建时间（birthtime）。
- *
- * @returns 若平台不支持或无效则返回 null
- */
-async function getFileBirthTime(filePath: string): Promise<Date | null> {
-	try {
-		const stats = await stat(filePath);
-		const birthtime = stats.birthtime;
-		if (!birthtime || Number.isNaN(birthtime.getTime()) || birthtime.getTime() === 0) {
-			return null;
-		}
-		return birthtime;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * 获取文件在 Git 历史中的“最早提交信息”（作者 + 提交时间）。
- *
- * 说明：
- * - 对未跟踪/无历史文件，git log 输出为空，函数返回空字符串字段（由上层做兜底）。
- * - 时间格式固定为本地字符串 `YYYY-MM-DD HH:mm:ss`。
- */
-async function getOriginalGitCommitInfo(filePath: string): Promise<GitCommitInfo> {
-	return new Promise((resolve) => {
-		const command = `git --no-pager log --reverse --pretty=format:"%an|||%ad" --date=format:"%Y-%m-%d %H:%M:%S" -1 -- "${filePath.replace(/"/g, '\\"')}"`;
-
-		exec(command, { cwd: vscode.workspace.rootPath }, (error, stdout, stderr) => {
-			const trimmed = stdout?.trim() ?? '';
-			if (trimmed) {
-				const delimiter = '|||';
-				const delimiterIndex = trimmed.indexOf(delimiter);
-				if (delimiterIndex >= 0) {
-					const author = trimmed.slice(0, delimiterIndex).trim();
-					const date = trimmed.slice(delimiterIndex + delimiter.length).trim();
-					logDebug(`成功获取原始提交信息 - 作者: ${author}, 时间: ${date}`);
-					resolve({ author, date });
-					return;
-				}
-
-				// Unexpected format; still return something sane.
-				resolve({ author: trimmed, date: '' });
-				return;
-			}
-
-			// 常见原因：文件未纳入 Git 追踪/无历史。这里只记录到 Output 面板，功能仍按空值兜底继续。
-			logWarn('无法获取原始提交信息（将使用兜底值）:', error?.message || stderr);
-			// 对未跟踪/无历史文件，stdout 为空：让后续逻辑做兜底选择。
-			resolve({ author: '', date: '' });
-		});
-	});
-}
-
 /**
  * VS Code 扩展激活入口：注册命令并在执行时向文件顶部插入头注释。
  *
@@ -128,32 +36,20 @@ export function activate(context: vscode.ExtensionContext) {
 	logChannel = vscode.window.createOutputChannel('Git Original Author Header', { log: true });
 	context.subscriptions.push(logChannel);
 
-	let disposable = vscode.commands.registerCommand('git-original-author-header.insertGitOriginalHeader', async () => {
+	const insertDisposable = vscode.commands.registerCommand('git-original-author-header.insertGitOriginalHeader', async () => {
 		const editor = vscode.window.activeTextEditor;
 		if (!editor) {
 			vscode.window.showWarningMessage('没有活跃的编辑器窗口！');
 			return;
 		}
 
-		const document = editor.document;
-		const filePath = document.fileName;
-		const languageId = document.languageId;
 		const commentStyleConfig = readCommentStyleConfig();
-		const resolved = resolveCommentStyle({ languageId, fileName: filePath, config: commentStyleConfig });
-		if (resolved.reason === 'noCommentLanguage') {
-			vscode.window.showWarningMessage('该文件类型不支持注释（例如 JSON）。已跳过插入文件头。你可以在设置中为该类型指定注释风格，或改用支持注释的语言模式（如 JSONC）。');
-			return;
-		}
-		let chosenCommentStyle = resolved.style;
-		if (!chosenCommentStyle) {
-			const unknownBehavior = getUnknownFileBehavior(commentStyleConfig);
-			if (unknownBehavior === 'skip') {
-				vscode.window.showWarningMessage(`无法判断该文件的注释方式（languageId=${languageId}）。已跳过插入；可在设置中配置 commentStyleByLanguage/commentStyleByExtension。`);
-				return;
-			}
-			if (unknownBehavior === 'fallback') {
-				chosenCommentStyle = 'cBlock';
-			} else {
+		const result = await insertGitOriginalHeaderForDocument({
+			document: editor.document,
+			editor,
+			mode: 'single',
+			commentStyleConfig,
+			unknownCommentStylePicker: async (input) => {
 				const picked = await vscode.window.showQuickPick(
 					[
 						{ label: 'C 块注释', description: '/* ... */', style: 'cBlock' as const },
@@ -163,50 +59,45 @@ export function activate(context: vscode.ExtensionContext) {
 						{ label: 'PowerShell 块注释', description: '<# ... #>', style: 'powershellBlock' as const },
 						{ label: 'Lua 块注释', description: '--[[ ... ]]', style: 'luaBlock' as const },
 					],
-					{ title: '无法自动识别注释方式，请选择一种用于插入文件头' }
+					{ title: `无法自动识别注释方式（languageId=${input.languageId}），请选择一种用于插入文件头` }
 				);
-				if (!picked) {
+				return picked?.style ?? null;
+			},
+		});
+
+		if (result.kind === 'inserted') {
+			vscode.window.showInformationMessage('已插入包含原始Git作者的文件头！');
+			return;
+		}
+		if (result.kind === 'skipped') {
+			switch (result.reason) {
+				case 'noCommentLanguage':
+					vscode.window.showWarningMessage('该文件类型不支持注释（例如 JSON）。已跳过插入文件头。你可以在设置中为该类型指定注释风格，或改用支持注释的语言模式（如 JSONC）。');
 					return;
-				}
-				chosenCommentStyle = picked.style;
+				case 'unknownCommentStyle':
+					vscode.window.showWarningMessage(`无法判断该文件的注释方式（languageId=${editor.document.languageId}）。已跳过插入；可在设置中配置 commentStyleByLanguage/commentStyleByExtension。`);
+					return;
+				case 'dirtyDocument':
+					vscode.window.showWarningMessage('当前文件有未保存修改，为避免冲突已跳过插入。请先保存文件后重试。');
+					return;
+				default:
+					vscode.window.showWarningMessage('当前文件无法插入文件头（已跳过）。');
+					return;
 			}
 		}
-		const currentGitUserName = await getCurrentGitUserName();
 
-		const originalCommitInfo = await getOriginalGitCommitInfo(filePath);
-		const originalAuthor = pickAuthor({
-			gitOriginalAuthor: originalCommitInfo.author,
-			currentGitUserName,
-		});
-		const gitOriginalDateString = originalCommitInfo.date; // `YYYY-MM-DD HH:mm:ss`
-		const gitOriginalDate = parseLocalDateTimeString(gitOriginalDateString);
-
-		const fileBirthTime = await getFileBirthTime(filePath);
-		const chosenDate = pickEarliestDate(gitOriginalDate, fileBirthTime) ?? parseLocalDateTimeString('1970-01-01 00:00:00')!; // 始终取“更早的时间”作为创建时间
-		const chosenDateString = formatLocalDateTime(chosenDate);
-
-		const lastEditor = currentGitUserName || 'Current User';
-		const currentDateTime = formatLocalDateTime(new Date());
-		const relativeFilePath = formatProjectRootFilePath(filePath);
-
-		const headerLines = renderHeaderBodyLines({
-			author: originalAuthor,
-			date: chosenDateString,
-			lastEditors: lastEditor,
-			lastEditTime: currentDateTime,
-			filePath: relativeFilePath,
-			description: '',
-		});
-		const header = wrapWithComment(chosenCommentStyle, headerLines) + '\n';
-
-		editor.edit(editBuilder => {
-			editBuilder.insert(new vscode.Position(0, 0), header);
-		});
-
-		vscode.window.showInformationMessage('已插入包含原始Git作者的文件头！');
+		logWarn('Insert header failed:', result);
+		vscode.window.showErrorMessage(`插入文件头失败：${result.message}`);
 	});
 
-	context.subscriptions.push(disposable);
+	const batchDisposable = vscode.commands.registerCommand(
+		'git-original-author-header.batchInsertMissingHeadersInFolder',
+		async (uri?: vscode.Uri) => {
+			await batchInsertMissingHeadersInFolder(uri);
+		}
+	);
+
+	context.subscriptions.push(insertDisposable, batchDisposable);
 }
 
 /**

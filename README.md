@@ -65,6 +65,17 @@
 1. 在编辑器中右键点击，选择"插入Git原始作者文件头"
 2. 或使用命令面板（Ctrl+Shift+P）输入"插入Git原始作者文件头"
 
+## 批量补充（文件夹）
+
+当你需要为某个文件夹（包含子文件夹）下的大量文件补齐缺失的文件头时，可以使用批量命令。
+
+### 使用方法
+
+1. 在资源管理器中右键点击文件夹，选择"批量补充文件头注释"
+2. 或使用命令面板（Ctrl+Shift+P）输入"批量补充文件头注释"，然后选择目标文件夹
+
+批量模式会先扫描并提示确认，只对“缺少该扩展生成的文件头”的文件执行插入，并提供进度与可取消操作。
+
 ## 安装
 
 1. 获取 `.vsix` 文件
@@ -96,6 +107,23 @@
 		- `skip`：跳过插入并提示（默认，避免破坏文件）
 		- `fallback`：使用默认块注释（`cBlock`）继续插入
 
+### 批量设置项
+
+- `git-original-author-header.batchConcurrency`
+	- 批量处理时的最大并发数。
+- `git-original-author-header.batchExcludePatterns`
+	- 批量处理时排除的 glob 模式。
+- `git-original-author-header.batchIncludeExtensions`
+	- 批量处理时允许处理的扩展名白名单（为空表示不过滤扩展名）。
+- `git-original-author-header.commentCheckLines`
+	- 检测文件是否已有文件头时检查的行数。
+- `git-original-author-header.skipBinaryFiles`
+	- 是否跳过二进制文件。
+- `git-original-author-header.continueOnError`
+	- 遇到错误是否继续处理后续文件。
+- `git-original-author-header.generateReport`
+	- 是否生成可复制的处理报告。
+
 ### 示例：settings.json
 
 ```json
@@ -108,7 +136,12 @@
 		".vue": "htmlBlock",
 		"proto": "slashLine"
 	},
-	"git-original-author-header.unknownFileBehavior": "prompt"
+	"git-original-author-header.unknownFileBehavior": "prompt",
+	"git-original-author-header.batchExcludePatterns": [
+		"**/test/**",
+		"**/*.spec.ts"
+	],
+	"git-original-author-header.batchConcurrency": 3
 }
 ```
 
