@@ -55,7 +55,7 @@
 
 - `pnpm install`
 - 推荐：`pnpm run package-vsix`
-	- 产物输出到 `out/`，文件名包含版本号（例如 `out/git-original-author-header-1.0.3.vsix`）
+	- 产物输出到 `out/`，文件名包含版本号（例如 `out/git-original-author-header-1.1.4.vsix`）
 	- CI（tag 发布）会用 tag 版本号覆盖该版本号
 
 也可以使用：

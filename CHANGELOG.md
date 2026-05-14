@@ -6,6 +6,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-05-14
+
+- 新增：文件夹“批量补充文件头注释”（命令：`git-original-author-header.batchInsertMissingHeadersInFolder`），支持资源管理器右键文件夹与命令面板触发。
+- 新增：批量流程（递归扫描、按规则过滤、仅对缺失文件头的文件执行插入、进度条展示并支持取消、结束后汇总并可生成可复制报告）。
+- 新增：批量相关配置项（`batchConcurrency` / `batchExcludePatterns` / `batchIncludeExtensions` / `commentCheckLines` / `skipBinaryFiles` / `continueOnError` / `generateReport`）。
+
 ## [1.0.4] - 2026-01-29
 
 - 优化：默认注释改为HTML注释；

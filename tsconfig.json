@@ -4,7 +4,8 @@
 		"target": "ES2022",
 		"outDir": "./dist",  // 添加这一行
 		"types": [
-			"node"
+			"node",
+			"mocha"
 		],
 		"lib": [
 			"ES2022"
