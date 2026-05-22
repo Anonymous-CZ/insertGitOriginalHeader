@@ -13,7 +13,7 @@
   "bugs": {
     "url": "https://github.com/Anonymous-CZ/insertGitOriginalHeader/issues"
   },
-  "version": "1.2.0",
+  "version": "1.2.1",
   "engines": {
     "vscode": "^1.121.0"
   },
@@ -21,10 +21,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:git-original-author-header.insertGitOriginalHeader",
-    "onCommand:git-original-author-header.batchInsertMissingHeadersInFolder",
-    "onCommand:git-original-author-header.updateHeaderLastEditMeta",
-    "onCommand:git-original-author-header.batchUpdateHeaderLastEditMetaInFolder"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -107,8 +104,8 @@
         },
         "git-original-author-header.autoUpdateLastEditOnSave": {
           "type": "boolean",
-          "default": false,
-          "description": "保存文件时是否自动刷新文件头中的 LastEditors/LastEditTime（默认关闭）。"
+          "default": true,
+          "description": "保存文件时是否自动刷新文件头中的 LastEditors/LastEditTime（默认开启）。若同时启用 koroFileHeader 的保存自动更新能力，可能出现字段相互覆盖。"
         },
         "git-original-author-header.batchConcurrency": {
           "type": "number",

@@ -2,7 +2,7 @@
  * @Author: Anonymous-CZ
  * @Date: 2026-01-18 13:30:06
  * @LastEditors: Anonymous-CZ
- * @LastEditTime: 2026-05-14 11:06:00
+ * @LastEditTime: 2026-05-22 15:03:56
  * @FilePath: /insertGitOriginalHeader/src/extension.ts
  * @Description: VS Code 扩展入口：获取 Git 原始作者/时间并按注释风格插入文件头。
  */
@@ -16,6 +16,8 @@ import { batchUpdateHeaderLastEditMetaInFolder } from './batch/batchUpdateHeader
 import { formatLocalDateTime } from './dateTime';
 import { collectLastEditMetaLineUpdates, updateHeaderLastEditMetaForDocument } from './updateLastEditMeta';
 const DEBUG_LOG_ENABLED = process.env.GIT_ORIGINAL_AUTHOR_HEADER_DEBUG === '1'; // 设为 "1" 时输出调试日志
+const KORO_FILE_HEADER_EXTENSION_ID = 'OBKoro1.korofileheader';
+const KORO_CONFLICT_WARNING_SHOWN_KEY = 'git-original-author-header.koroConflictWarningShown';
 
 let logChannel: vscode.LogOutputChannel | undefined;
 
@@ -30,6 +32,24 @@ function logWarn(message: string, ...optionalParams: unknown[]): void {
 	logChannel?.warn(message, ...optionalParams);
 }
 
+async function maybeShowKoroFileHeaderConflictWarning(context: vscode.ExtensionContext): Promise<void> {
+	if (!readAutoUpdateLastEditOnSave()) {
+		return;
+	}
+	if (context.workspaceState.get<boolean>(KORO_CONFLICT_WARNING_SHOWN_KEY)) {
+		return;
+	}
+	if (!vscode.extensions.getExtension(KORO_FILE_HEADER_EXTENSION_ID)) {
+		return;
+	}
+
+	await vscode.window.showWarningMessage(
+		'检测到已安装 koroFileHeader。当前扩展默认开启“保存时自动刷新 LastEditors/LastEditTime”，若两者都在保存时写入文件头，可能出现字段相互覆盖。建议在任一扩展中关闭保存自动更新。',
+		'知道了'
+	);
+	await context.workspaceState.update(KORO_CONFLICT_WARNING_SHOWN_KEY, true);
+}
+
 /**
  * VS Code 扩展激活入口：注册命令并在执行时向文件顶部插入头注释。
  *
@@ -38,6 +58,9 @@ function logWarn(message: string, ...optionalParams: unknown[]): void {
 export function activate(context: vscode.ExtensionContext) {
 	logChannel = vscode.window.createOutputChannel('Git Original Author Header', { log: true });
 	context.subscriptions.push(logChannel);
+	void maybeShowKoroFileHeaderConflictWarning(context).catch(error => {
+		logWarn('Show koroFileHeader conflict warning failed:', error);
+	});
 
 	const insertDisposable = vscode.commands.registerCommand('git-original-author-header.insertGitOriginalHeader', async () => {
 		const editor = vscode.window.activeTextEditor;

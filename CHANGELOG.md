@@ -4,7 +4,10 @@ All notable changes to the "insertGitOriginalHeader" extension will be documente
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
+## [1.2.1] - 2026-05-22
+
+- 变更：`git-original-author-header.autoUpdateLastEditOnSave` 默认值改为开启。
+- 提示：当检测到已安装 koroFileHeader 且启用保存自动更新时，扩展会提醒可能存在字段相互覆盖冲突。
 
 ## [1.2.0] - 2026-05-22
 

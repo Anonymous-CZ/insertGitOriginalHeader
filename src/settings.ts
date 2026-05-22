@@ -2,7 +2,7 @@
  * @Author: Anonymous-CZ
  * @Date: 2026-05-14 11:01:04
  * @LastEditors: Anonymous-CZ
- * @LastEditTime: 2026-05-14 11:06:24
+ * @LastEditTime: 2026-05-22 15:03:42
  * @FilePath: /insertGitOriginalHeader/src/settings.ts
  * @Description: 读取 VS Code Settings（注释风格配置与批量处理配置）
  */
@@ -43,5 +43,5 @@ export function readBatchConfig(): BatchConfig {
 
 export function readAutoUpdateLastEditOnSave(): boolean {
 	const config = vscode.workspace.getConfiguration('git-original-author-header');
-	return config.get<boolean>('autoUpdateLastEditOnSave') ?? false;
+	return config.get<boolean>('autoUpdateLastEditOnSave') ?? true;
 }

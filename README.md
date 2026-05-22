@@ -126,8 +126,9 @@
 		- `fallback`：使用默认块注释（`cBlock`）继续插入
 - `git-original-author-header.autoUpdateLastEditOnSave`
 	- 保存文件时自动刷新文件头中的 `@LastEditors` / `@LastEditTime`。
-	- 默认 `false`（关闭）。
+	- 默认 `true`（开启）。
 	- 仅当文件顶部检测到本扩展文件头且包含 Last 字段时才会更新。
+	- 若同时启用 koroFileHeader 的保存自动更新能力，可能出现字段相互覆盖，建议在任一扩展中关闭保存自动更新。
 
 ### 批量设置项
 
@@ -159,7 +160,7 @@
 		"proto": "slashLine"
 	},
 	"git-original-author-header.unknownFileBehavior": "prompt",
-	"git-original-author-header.autoUpdateLastEditOnSave": false,
+	"git-original-author-header.autoUpdateLastEditOnSave": true,
 	"git-original-author-header.batchExcludePatterns": [
 		"**/test/**",
 		"**/*.spec.ts"
