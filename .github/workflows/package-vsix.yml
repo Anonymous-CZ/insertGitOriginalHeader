@@ -96,5 +96,9 @@ jobs:
             1. 下载下方的 .vsix 文件
             2. 在 VSCode 中运行 "Extensions: Install from VSIX..."
             3. 选择下载的 .vsix 文件
+
+            ### 校验信息
+            - 构建时间: ${{ github.event.head_commit.timestamp }}
+            - 提交: ${{ github.sha }}
           files: |
             out/*.vsix
