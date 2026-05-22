@@ -40,3 +40,8 @@ export function readBatchConfig(): BatchConfig {
 		generateReport: config.get<boolean>('generateReport') ?? true,
 	};
 }
+
+export function readAutoUpdateLastEditOnSave(): boolean {
+	const config = vscode.workspace.getConfiguration('git-original-author-header');
+	return config.get<boolean>('autoUpdateLastEditOnSave') ?? false;
+}

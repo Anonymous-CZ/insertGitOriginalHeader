@@ -6,6 +6,14 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-22
+
+- 新增：单文件命令 `git-original-author-header.updateHeaderLastEditMeta`，用于仅更新文件头中的 `@LastEditors` / `@LastEditTime`。
+- 新增：文件夹批量命令 `git-original-author-header.batchUpdateHeaderLastEditMetaInFolder`，用于批量更新已存在文件头的 `@LastEditors` / `@LastEditTime`。
+- 新增：可选设置 `git-original-author-header.autoUpdateLastEditOnSave`（默认关闭），启用后可在保存文件时自动刷新 `@LastEditors` / `@LastEditTime`。
+- 新增：插入文件头命令默认快捷键（Windows/Linux: Ctrl+Alt+G，macOS: Cmd+Option+G），并支持在 VS Code 快捷键设置中自定义覆盖。
+- 新增：更新 Last 字段命令默认快捷键（Windows/Linux: Ctrl+Alt+U，macOS: Cmd+Option+U），并支持在 VS Code 快捷键设置中自定义覆盖。
+
 ## [1.1.4] - 2026-05-14
 
 - 新增：文件夹“批量补充文件头注释”（命令：`git-original-author-header.batchInsertMissingHeadersInFolder`），支持资源管理器右键文件夹与命令面板触发。

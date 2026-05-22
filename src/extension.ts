@@ -9,9 +9,12 @@
 
 import * as vscode from 'vscode';
 import type { CommentStyle } from './commentStyle';
-import { readCommentStyleConfig } from './settings';
-import { insertGitOriginalHeaderForDocument } from './insertHeader';
+import { readAutoUpdateLastEditOnSave, readBatchConfig, readCommentStyleConfig } from './settings';
+import { getCurrentGitUserName, insertGitOriginalHeaderForDocument } from './insertHeader';
 import { batchInsertMissingHeadersInFolder } from './batch/batchInsertMissingHeadersInFolder';
+import { batchUpdateHeaderLastEditMetaInFolder } from './batch/batchUpdateHeaderLastEditMetaInFolder';
+import { formatLocalDateTime } from './dateTime';
+import { collectLastEditMetaLineUpdates, updateHeaderLastEditMetaForDocument } from './updateLastEditMeta';
 const DEBUG_LOG_ENABLED = process.env.GIT_ORIGINAL_AUTHOR_HEADER_DEBUG === '1'; // 设为 "1" 时输出调试日志
 
 let logChannel: vscode.LogOutputChannel | undefined;
@@ -97,7 +100,103 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	);
 
-	context.subscriptions.push(insertDisposable, batchDisposable);
+	const updateLastEditDisposable = vscode.commands.registerCommand('git-original-author-header.updateHeaderLastEditMeta', async () => {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			vscode.window.showWarningMessage('没有活跃的编辑器窗口！');
+			return;
+		}
+
+		const batchConfig = readBatchConfig();
+		const gitUserName = await getCurrentGitUserName(editor.document.uri);
+		const result = await updateHeaderLastEditMetaForDocument({
+			document: editor.document,
+			editor,
+			checkLines: batchConfig.commentCheckLines,
+			lastEditors: gitUserName || 'Current User',
+			lastEditTime: formatLocalDateTime(new Date()),
+		});
+
+		if (result.kind === 'updated') {
+			vscode.window.showInformationMessage('已更新文件头中的 LastEditors 和 LastEditTime。');
+			return;
+		}
+		if (result.kind === 'skipped') {
+			switch (result.reason) {
+				case 'headerNotFound':
+					vscode.window.showWarningMessage('当前文件未检测到可更新的文件头注释。');
+					return;
+				case 'missingLastFields':
+					vscode.window.showWarningMessage('检测到文件头，但缺少 LastEditors 或 LastEditTime 字段，已跳过更新。');
+					return;
+				case 'dirtyDocument':
+					vscode.window.showWarningMessage('当前文件有未保存修改，为避免冲突已跳过更新。请先保存文件后重试。');
+					return;
+				case 'notFileDocument':
+					vscode.window.showWarningMessage('当前文档不是本地文件，已跳过更新。');
+					return;
+				default:
+					vscode.window.showWarningMessage('当前文件无法更新 Last 字段（已跳过）。');
+					return;
+			}
+		}
+
+		logWarn('Update LastEdit metadata failed:', result);
+		vscode.window.showErrorMessage(`更新 Last 字段失败：${result.message}`);
+	});
+
+	const batchUpdateLastEditDisposable = vscode.commands.registerCommand(
+		'git-original-author-header.batchUpdateHeaderLastEditMetaInFolder',
+		async (uri?: vscode.Uri) => {
+			await batchUpdateHeaderLastEditMetaInFolder(uri);
+		}
+	);
+
+	const autoUpdateOnSaveDisposable = vscode.workspace.onWillSaveTextDocument(event => {
+		if (!readAutoUpdateLastEditOnSave()) {
+			return;
+		}
+
+		const document = event.document;
+		if (document.uri.scheme !== 'file') {
+			return;
+		}
+
+		event.waitUntil((async (): Promise<vscode.TextEdit[]> => {
+			try {
+				const batchConfig = readBatchConfig();
+				const safeLines = Math.max(1, Math.min(200, Math.floor(batchConfig.commentCheckLines)));
+				const lineCount = Math.min(document.lineCount, safeLines);
+				const lines = Array.from({ length: lineCount }, (_, index) => document.lineAt(index).text);
+
+				const gitUserName = await getCurrentGitUserName(document.uri);
+				const collected = collectLastEditMetaLineUpdates({
+					lines,
+					checkLines: safeLines,
+					lastEditors: gitUserName || 'Current User',
+					lastEditTime: formatLocalDateTime(new Date()),
+				});
+				if (collected.kind !== 'updatable') {
+					return [];
+				}
+
+				const edits: vscode.TextEdit[] = [];
+				for (const update of collected.updates) {
+					const line = document.lineAt(update.line);
+					if (line.text === update.text) {
+						continue;
+					}
+					edits.push(vscode.TextEdit.replace(new vscode.Range(update.line, 0, update.line, line.text.length), update.text));
+				}
+				return edits;
+			} catch (error) {
+				logWarn('Auto update LastEdit metadata on save failed:', error);
+				return [];
+			}
+		})());
+	});
+
+	context.subscriptions.push(insertDisposable, batchDisposable, updateLastEditDisposable, batchUpdateLastEditDisposable, autoUpdateOnSaveDisposable);
 }
 
 /**

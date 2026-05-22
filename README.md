@@ -15,6 +15,8 @@
 - 获取当前文件的 Git 原始作者信息
 - 获取当前文件的 Git 最早提交时间，并与文件创建时间比较后写入 `@Date`
 - 将作者/时间等信息插入到文件头部作为注释
+- 支持单文件更新已有文件头中的 `@LastEditors` / `@LastEditTime`
+- 支持批量更新文件夹内已有文件头中的 `@LastEditors` / `@LastEditTime`
 - 支持通过右键菜单或命令面板操作
 
 ## 字段说明
@@ -32,6 +34,37 @@
 
 1. 在编辑器中右键点击，选择"插入Git原始作者文件头"
 2. 或使用命令面板（Ctrl+Shift+P）输入"插入Git原始作者文件头"
+3. 或使用默认快捷键：
+	- Windows / Linux：Ctrl+Alt+G
+	- macOS：Cmd+Option+G
+
+### 自定义快捷键
+
+1. 打开 VS Code 快捷键设置（Keyboard Shortcuts）
+2. 搜索并选择命令：
+	- `git-original-author-header.insertGitOriginalHeader`
+	- `git-original-author-header.updateHeaderLastEditMeta`
+3. 为命令绑定你自己的快捷键（会覆盖扩展默认值）
+
+## 更新 Last 字段（当前文件）
+
+当文件已包含本扩展生成的文件头时，你可以只更新：
+
+- `@LastEditors`
+- `@LastEditTime`
+
+使用方法：
+
+1. 在编辑器中右键点击，选择"更新文件头 LastEditors/LastEditTime"
+2. 或使用命令面板（Ctrl+Shift+P）输入"更新文件头 LastEditors/LastEditTime"
+3. 或使用默认快捷键：
+	- Windows / Linux：Ctrl+Alt+U
+	- macOS：Cmd+Option+U
+
+说明：
+
+- 仅更新 `@LastEditors` / `@LastEditTime`，不会改动 `@Author` / `@Date` / `@FilePath` / `@Description`。
+- 若当前文件没有本扩展识别的文件头，命令会跳过并提示。
 
 ## 批量补充（文件夹）
 
@@ -44,6 +77,17 @@
 
 批量模式会先扫描并提示确认，只对“缺少该扩展生成的文件头”的文件执行插入，并提供进度与可取消操作。
 
+## 批量更新 Last 字段（文件夹）
+
+当你需要统一刷新某个文件夹下已存在文件头的 `@LastEditors` / `@LastEditTime` 时，可以使用批量更新命令。
+
+### 使用方法
+
+1. 在资源管理器中右键点击文件夹，选择"批量更新文件头 LastEditors/LastEditTime"
+2. 或使用命令面板（Ctrl+Shift+P）输入"批量更新文件头 LastEditors/LastEditTime"，然后选择目标文件夹
+
+批量更新模式会先扫描并提示确认，只对“已存在该扩展文件头”的文件执行更新，并提供进度与可取消操作。
+
 ## 安装
 
 1. 获取 `.vsix` 文件
@@ -55,7 +99,7 @@
 
 - `pnpm install`
 - 推荐：`pnpm run package-vsix`
-	- 产物输出到 `out/`，文件名包含版本号（例如 `out/git-original-author-header-1.1.4.vsix`）
+	- 产物输出到 `out/`，文件名包含版本号（例如 `out/git-original-author-header-1.2.0.vsix`）
 	- CI（tag 发布）会用 tag 版本号覆盖该版本号
 
 也可以使用：
@@ -80,6 +124,10 @@
 		- `prompt`：弹窗让你选择一种注释方式
 		- `skip`：跳过插入并提示（默认，避免破坏文件）
 		- `fallback`：使用默认块注释（`cBlock`）继续插入
+- `git-original-author-header.autoUpdateLastEditOnSave`
+	- 保存文件时自动刷新文件头中的 `@LastEditors` / `@LastEditTime`。
+	- 默认 `false`（关闭）。
+	- 仅当文件顶部检测到本扩展文件头且包含 Last 字段时才会更新。
 
 ### 批量设置项
 
@@ -111,6 +159,7 @@
 		"proto": "slashLine"
 	},
 	"git-original-author-header.unknownFileBehavior": "prompt",
+	"git-original-author-header.autoUpdateLastEditOnSave": false,
 	"git-original-author-header.batchExcludePatterns": [
 		"**/test/**",
 		"**/*.spec.ts"

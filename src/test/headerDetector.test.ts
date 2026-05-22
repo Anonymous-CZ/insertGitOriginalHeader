@@ -32,7 +32,7 @@ suite('batch header detector', () => {
 		const text = [
 			'@Author: A',
 			'@Date: D',
-			'// missing @FilePath',
+			'// missing file path marker',
 		].join('\n');
 		assert.strictEqual(hasExistingGitOriginalAuthorHeader(text, 20), false);
 	});

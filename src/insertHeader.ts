@@ -50,7 +50,7 @@ function getGitCwdForUri(targetUri: vscode.Uri | undefined): string | undefined 
 	return vscode.workspace.rootPath ?? undefined;
 }
 
-async function getCurrentGitUserName(documentUri: vscode.Uri): Promise<string> {
+export async function getCurrentGitUserName(documentUri: vscode.Uri): Promise<string> {
 	try {
 		const { stdout } = await execFileAsync('git', ['config', 'user.name'], { cwd: getGitCwdForUri(documentUri) });
 		return (stdout ?? '').trim();

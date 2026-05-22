@@ -13,16 +13,18 @@
   "bugs": {
     "url": "https://github.com/Anonymous-CZ/insertGitOriginalHeader/issues"
   },
-  "version": "1.1.4",
+  "version": "1.2.0",
   "engines": {
-    "vscode": "^1.120.0"
+    "vscode": "^1.121.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
     "onCommand:git-original-author-header.insertGitOriginalHeader",
-    "onCommand:git-original-author-header.batchInsertMissingHeadersInFolder"
+    "onCommand:git-original-author-header.batchInsertMissingHeadersInFolder",
+    "onCommand:git-original-author-header.updateHeaderLastEditMeta",
+    "onCommand:git-original-author-header.batchUpdateHeaderLastEditMetaInFolder"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -34,6 +36,28 @@
       {
         "command": "git-original-author-header.batchInsertMissingHeadersInFolder",
         "title": "批量补充文件头注释"
+      },
+      {
+        "command": "git-original-author-header.updateHeaderLastEditMeta",
+        "title": "更新文件头 LastEditors/LastEditTime"
+      },
+      {
+        "command": "git-original-author-header.batchUpdateHeaderLastEditMetaInFolder",
+        "title": "批量更新文件头 LastEditors/LastEditTime"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "git-original-author-header.insertGitOriginalHeader",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g",
+        "when": "editorTextFocus && !editorReadonly"
+      },
+      {
+        "command": "git-original-author-header.updateHeaderLastEditMeta",
+        "key": "ctrl+alt+u",
+        "mac": "cmd+alt+u",
+        "when": "editorTextFocus && !editorReadonly"
       }
     ],
     "configuration": {
@@ -80,6 +104,11 @@
           ],
           "default": "skip",
           "description": "无法识别注释方式时的行为：prompt=弹窗选择，skip=跳过并提示，fallback=使用默认块注释（cBlock）。"
+        },
+        "git-original-author-header.autoUpdateLastEditOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "保存文件时是否自动刷新文件头中的 LastEditors/LastEditTime（默认关闭）。"
         },
         "git-original-author-header.batchConcurrency": {
           "type": "number",
@@ -162,11 +191,20 @@
         {
           "command": "git-original-author-header.insertGitOriginalHeader",
           "group": "1_modification"
+        },
+        {
+          "command": "git-original-author-header.updateHeaderLastEditMeta",
+          "group": "1_modification"
         }
       ],
       "explorer/context": [
         {
           "command": "git-original-author-header.batchInsertMissingHeadersInFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "1_modification"
+        },
+        {
+          "command": "git-original-author-header.batchUpdateHeaderLastEditMetaInFolder",
           "when": "explorerResourceIsFolder",
           "group": "1_modification"
         }
