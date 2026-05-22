@@ -2,7 +2,7 @@
  * @Author: Anonymous-CZ
  * @Date: 2026-01-18 13:30:06
  * @LastEditors: Anonymous-CZ
- * @LastEditTime: 2026-05-22 15:03:56
+ * @LastEditTime: 2026-05-22 15:09:15
  * @FilePath: /insertGitOriginalHeader/src/extension.ts
  * @Description: VS Code 扩展入口：获取 Git 原始作者/时间并按注释风格插入文件头。
  */
@@ -18,6 +18,12 @@ import { collectLastEditMetaLineUpdates, updateHeaderLastEditMetaForDocument } f
 const DEBUG_LOG_ENABLED = process.env.GIT_ORIGINAL_AUTHOR_HEADER_DEBUG === '1'; // 设为 "1" 时输出调试日志
 const KORO_FILE_HEADER_EXTENSION_ID = 'OBKoro1.korofileheader';
 const KORO_CONFLICT_WARNING_SHOWN_KEY = 'git-original-author-header.koroConflictWarningShown';
+const GIT_USER_CACHE_TTL_MS = 5 * 60 * 1000;
+const WILL_SAVE_GIT_USER_TIMEOUT_MS = 120;
+
+const gitUserNameCache = new Map<string, { value: string; expiresAt: number }>();
+const gitUserNamePending = new Map<string, Promise<string>>();
+const skipNextDidSaveForUri = new Set<string>();
 
 let logChannel: vscode.LogOutputChannel | undefined;
 
@@ -30,6 +36,136 @@ function logDebug(message: string, ...optionalParams: unknown[]): void {
 
 function logWarn(message: string, ...optionalParams: unknown[]): void {
 	logChannel?.warn(message, ...optionalParams);
+}
+
+function getGitUserCacheKey(uri: vscode.Uri): string {
+	const folder = vscode.workspace.getWorkspaceFolder(uri);
+	return folder?.uri.toString() ?? '__default__';
+}
+
+function getCachedGitUserName(uri: vscode.Uri): string {
+	const key = getGitUserCacheKey(uri);
+	const cached = gitUserNameCache.get(key);
+	if (!cached) {
+		return '';
+	}
+	if (cached.expiresAt <= Date.now()) {
+		gitUserNameCache.delete(key);
+		return '';
+	}
+	return cached.value;
+}
+
+function cacheGitUserName(uri: vscode.Uri, userName: string): void {
+	if (!userName) {
+		return;
+	}
+	const key = getGitUserCacheKey(uri);
+	gitUserNameCache.set(key, {
+		value: userName,
+		expiresAt: Date.now() + GIT_USER_CACHE_TTL_MS,
+	});
+}
+
+async function refreshGitUserName(uri: vscode.Uri): Promise<string> {
+	const key = getGitUserCacheKey(uri);
+	const pending = gitUserNamePending.get(key);
+	if (pending) {
+		return pending;
+	}
+
+	const task = (async () => {
+		const userName = (await getCurrentGitUserName(uri)).trim();
+		cacheGitUserName(uri, userName);
+		return userName;
+	})()
+		.catch(() => '')
+		.finally(() => {
+			gitUserNamePending.delete(key);
+		});
+
+	gitUserNamePending.set(key, task);
+	return task;
+}
+
+function resolveCheckLines(): number {
+	const batchConfig = readBatchConfig();
+	return Math.max(1, Math.min(200, Math.floor(batchConfig.commentCheckLines)));
+}
+
+function collectLastEditOnSaveTextEdits(input: {
+	document: vscode.TextDocument;
+	checkLines: number;
+	lastEditors: string;
+	lastEditTime: string;
+}): vscode.TextEdit[] {
+	const lineCount = Math.min(input.document.lineCount, input.checkLines);
+	const lines = Array.from({ length: lineCount }, (_, index) => input.document.lineAt(index).text);
+	const collected = collectLastEditMetaLineUpdates({
+		lines,
+		checkLines: input.checkLines,
+		lastEditors: input.lastEditors,
+		lastEditTime: input.lastEditTime,
+	});
+	if (collected.kind !== 'updatable') {
+		return [];
+	}
+
+	const edits: vscode.TextEdit[] = [];
+	for (const update of collected.updates) {
+		const line = input.document.lineAt(update.line);
+		if (line.text === update.text) {
+			continue;
+		}
+		edits.push(vscode.TextEdit.replace(new vscode.Range(update.line, 0, update.line, line.text.length), update.text));
+	}
+
+	return edits;
+}
+
+async function resolveLastEditorsForWillSave(uri: vscode.Uri): Promise<string> {
+	const cached = getCachedGitUserName(uri);
+	const refreshPromise = refreshGitUserName(uri);
+	const timeoutPromise = new Promise<string>(resolve => {
+		const timer = setTimeout(() => resolve(cached), WILL_SAVE_GIT_USER_TIMEOUT_MS);
+		void refreshPromise.finally(() => clearTimeout(timer));
+	});
+
+	const resolved = await Promise.race([refreshPromise, timeoutPromise]);
+	return resolved || cached || 'Current User';
+}
+
+async function autoUpdateLastEditMetaAfterSave(document: vscode.TextDocument): Promise<void> {
+	const safeLines = resolveCheckLines();
+	const gitUserName = await refreshGitUserName(document.uri);
+	const edits = collectLastEditOnSaveTextEdits({
+		document,
+		checkLines: safeLines,
+		lastEditors: gitUserName || 'Current User',
+		lastEditTime: formatLocalDateTime(new Date()),
+	});
+	if (edits.length === 0) {
+		return;
+	}
+
+	const edit = new vscode.WorkspaceEdit();
+	for (const textEdit of edits) {
+		edit.replace(document.uri, textEdit.range, textEdit.newText);
+	}
+
+	const applied = await vscode.workspace.applyEdit(edit);
+	if (!applied) {
+		logWarn('Auto update LastEdit metadata after save failed: workspace.applyEdit returned false.');
+		return;
+	}
+
+	const uriKey = document.uri.toString();
+	skipNextDidSaveForUri.add(uriKey);
+	const saved = await document.save();
+	if (!saved) {
+		skipNextDidSaveForUri.delete(uriKey);
+		logWarn('Auto update LastEdit metadata after save failed: document.save returned false.');
+	}
 }
 
 async function maybeShowKoroFileHeaderConflictWarning(context: vscode.ExtensionContext): Promise<void> {
@@ -187,31 +323,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 		event.waitUntil((async (): Promise<vscode.TextEdit[]> => {
 			try {
-				const batchConfig = readBatchConfig();
-				const safeLines = Math.max(1, Math.min(200, Math.floor(batchConfig.commentCheckLines)));
-				const lineCount = Math.min(document.lineCount, safeLines);
-				const lines = Array.from({ length: lineCount }, (_, index) => document.lineAt(index).text);
-
-				const gitUserName = await getCurrentGitUserName(document.uri);
-				const collected = collectLastEditMetaLineUpdates({
-					lines,
+				const safeLines = resolveCheckLines();
+				const lastEditors = await resolveLastEditorsForWillSave(document.uri);
+				return collectLastEditOnSaveTextEdits({
+					document,
 					checkLines: safeLines,
-					lastEditors: gitUserName || 'Current User',
+					lastEditors,
 					lastEditTime: formatLocalDateTime(new Date()),
 				});
-				if (collected.kind !== 'updatable') {
-					return [];
-				}
-
-				const edits: vscode.TextEdit[] = [];
-				for (const update of collected.updates) {
-					const line = document.lineAt(update.line);
-					if (line.text === update.text) {
-						continue;
-					}
-					edits.push(vscode.TextEdit.replace(new vscode.Range(update.line, 0, update.line, line.text.length), update.text));
-				}
-				return edits;
 			} catch (error) {
 				logWarn('Auto update LastEdit metadata on save failed:', error);
 				return [];
@@ -219,7 +338,26 @@ export function activate(context: vscode.ExtensionContext) {
 		})());
 	});
 
-	context.subscriptions.push(insertDisposable, batchDisposable, updateLastEditDisposable, batchUpdateLastEditDisposable, autoUpdateOnSaveDisposable);
+	const autoUpdateAfterSaveDisposable = vscode.workspace.onDidSaveTextDocument(document => {
+		if (!readAutoUpdateLastEditOnSave()) {
+			return;
+		}
+		if (document.uri.scheme !== 'file') {
+			return;
+		}
+
+		const uriKey = document.uri.toString();
+		if (skipNextDidSaveForUri.has(uriKey)) {
+			skipNextDidSaveForUri.delete(uriKey);
+			return;
+		}
+
+		void autoUpdateLastEditMetaAfterSave(document).catch(error => {
+			logWarn('Auto update LastEdit metadata after save failed:', error);
+		});
+	});
+
+	context.subscriptions.push(insertDisposable, batchDisposable, updateLastEditDisposable, batchUpdateLastEditDisposable, autoUpdateOnSaveDisposable, autoUpdateAfterSaveDisposable);
 }
 
 /**

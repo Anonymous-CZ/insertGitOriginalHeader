@@ -8,6 +8,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - 变更：`git-original-author-header.autoUpdateLastEditOnSave` 默认值改为开启。
 - 提示：当检测到已安装 koroFileHeader 且启用保存自动更新时，扩展会提醒可能存在字段相互覆盖冲突。
+- 添加 Git 用户名缓存和自动更新功能，优化保存时的 LastEdit 元数据处理
 
 ## [1.2.0] - 2026-05-22
 
