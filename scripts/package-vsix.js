@@ -1,3 +1,11 @@
+/*
+ * @Author: Anonymous-CZ
+ * @Date: 2026-01-21 18:04:16
+ * @LastEditors: Anonymous-CZ
+ * @LastEditTime: 2026-05-22 16:04:31
+ * @FilePath: /insertGitOriginalHeader/scripts/package-vsix.js
+ * @Description: 生成 VSIX 包的脚本，使用 esbuild 构建扩展代码并调用 vsce CLI 进行打包。支持通过环境变量指定版本号和输出文件名
+ */
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');

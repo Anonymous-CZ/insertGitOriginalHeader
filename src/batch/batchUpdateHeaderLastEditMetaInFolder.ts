@@ -1,12 +1,11 @@
 /*
  * @Author: Anonymous-CZ
- * @Date: 2026-05-22 00:00:00
+ * @Date: 2026-05-14 13:36:28
  * @LastEditors: Anonymous-CZ
- * @LastEditTime: 2026-05-22 00:00:00
+ * @LastEditTime: 2026-05-22 16:03:48
  * @FilePath: /insertGitOriginalHeader/src/batch/batchUpdateHeaderLastEditMetaInFolder.ts
  * @Description: 递归扫描文件夹并批量更新文件头中的 LastEditors/LastEditTime
  */
-
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { open } from 'fs/promises';
